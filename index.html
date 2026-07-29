@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agente de Reglamento y Amenidades | Uplace</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
+        colors: {
+          brand: {
+            50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+            400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+            800: '#3730a3', 900: '#312e81'
+          }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.4); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.7); }
+  .msg-enter { animation: msgIn .25s ease-out; }
+  @keyframes msgIn { from { opacity:0; transform: translateY(6px);} to { opacity:1; transform: translateY(0);} }
+  .typing-dot { animation: blink 1.2s infinite; }
+  .typing-dot:nth-child(2) { animation-delay: .2s; }
+  .typing-dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+</style>
+</head>
+<body class="h-[100dvh] w-screen overflow-hidden bg-slate-100 font-sans text-slate-800 antialiased">
+
+<div class="flex h-full w-full">
+
+  <div id="sidebarOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-30 hidden md:hidden"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar"
+    class="fixed md:static z-40 md:z-auto inset-y-0 left-0 w-80 max-w-[85%] md:max-w-none
+           -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out
+           bg-white md:bg-white/70 md:backdrop-blur-xl border-r border-slate-200 flex flex-col h-full">
+
+    <div class="p-5 border-b border-slate-200 flex items-center gap-3">
+      <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white text-xl shadow-lg shadow-brand-500/30">
+        🛡️
+      </div>
+      <div class="min-w-0">
+        <h1 class="font-bold text-slate-900 leading-tight truncate">Reglamento Uplace</h1>
+        <p class="text-xs text-slate-500" id="edificioSummary">Cargando reglamento…</p>
+      </div>
+      <button id="closeSidebarBtn" class="ml-auto md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-500">
+        ✕
+      </button>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="p-4 space-y-2 border-b border-slate-200">
+      <button class="quick-action w-full flex items-center gap-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-xl px-3 py-2.5 shadow-sm shadow-brand-600/30 transition"
+        data-query="¿Qué amenidades están abiertas ahorita?">
+        🕒 <span>Horarios de hoy</span>
+      </button>
+      <button class="quick-action w-full flex items-center gap-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-3 py-2.5 shadow-sm shadow-emerald-600/30 transition"
+        data-query="¿A qué hora cierra el gimnasio y la alberca?">
+        🏊 <span>Horario Piso 6</span>
+      </button>
+    </div>
+
+    <!-- Contenedor scrollable: Reglamento por categoría + Amenidades -->
+    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div>
+        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide px-1 mb-1">Reglamento Interno</p>
+        <div id="reglamentoList" class="space-y-1"></div>
+      </div>
+      <div>
+        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide px-1 mb-1">Amenidades y Horarios</p>
+        <div id="amenidadesList" class="space-y-1"></div>
+      </div>
+    </div>
+
+    <!-- Panel admin (editar reglamento/amenidades, protegido con PIN) -->
+    <div class="px-4 pb-2 mt-auto">
+      <button onclick="abrirPanelAdmin()" class="w-full flex items-center justify-center gap-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-3 py-3 shadow-md transition active:scale-95">
+        ⚙️ Panel del Comité (Admin)
+      </button>
+    </div>
+
+    <div class="text-center p-4 border-t border-slate-200 text-[11px] text-black font-bold tracking-wide leading-relaxed">
+      Agente de Reglamento y Amenidades Uplace <br> Comité de Vigilancia
+    </div>
+  </aside>
+
+  <!-- Main chat -->
+  <main class="flex-1 flex flex-col min-w-0 h-full">
+    <header class="h-16 shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center gap-3 px-4 md:px-6">
+      <button id="openSidebarBtn" class="md:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 text-slate-600">
+        ☰
+      </button>
+      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white shadow-sm">
+        🛡️
+      </div>
+      <div class="min-w-0">
+        <h2 class="font-semibold text-slate-900 text-sm truncate">Agente de Reglamento y Amenidades</h2>
+        <p class="text-xs text-emerald-600 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> En línea
+        </p>
+      </div>
+    </header>
+
+    <div id="messages" class="flex-1 overflow-y-auto px-3 md:px-6 py-6 space-y-4 bg-[radial-gradient(circle_at_top,_#f8fafc,_#eef2f7)]">
+      <!-- messages injected here -->
+    </div>
+
+    <div class="shrink-0 border-t border-slate-200 bg-white/90 backdrop-blur-xl p-3 md:p-4" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));">
+      <form id="chatForm" class="flex items-end gap-2 max-w-4xl mx-auto">
+        <input
+          id="chatInput"
+          type="text"
+          autocomplete="off"
+          placeholder="Pregunta qué se puede o no se puede, o un horario…"
+          class="flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white px-4 py-3 text-[16px]
+                 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-400 transition"
+        />
+        <button type="submit"
+          class="shrink-0 w-11 h-11 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white flex items-center justify-center
+                 shadow-lg shadow-brand-600/30 transition active:scale-95">
+          ➤
+        </button>
+      </form>
+      <p class="text-center text-[9px] md:text-[11px] text-black font-bold mt-2 tracking-wide leading-snug px-1">DISEÑADO Y DESARROLLADO · POR PABLO CUETO PARA LA COMUNIDAD UPLACE</p>
+    </div>
+  </main>
+</div>
+
+<script src="app.js?v=20260729a"></script>
+
+<!-- Modal: Detalle de artículo / amenidad (al hacer click en el sidebar) -->
+<div id="modalDetalle" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85dvh]">
+    <div class="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+      <h3 id="modalDetalleTitulo" class="text-sm font-bold text-slate-800">Detalle</h3>
+      <button onclick="cerrarModalDetalle()" class="w-8 h-8 rounded-lg bg-slate-200/60 hover:bg-slate-200 text-slate-700 font-bold text-sm transition">✕</button>
+    </div>
+    <div id="modalDetalleBody" class="p-5 overflow-y-auto text-sm text-slate-700 leading-relaxed"></div>
+  </div>
+</div>
+
+<!-- Modal: Panel del Comité (Admin) -->
+<div id="modalAdmin" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90dvh]">
+    <div class="px-5 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+      <h3 class="text-sm font-bold text-white">⚙️ Panel del Comité (Admin)</h3>
+      <button onclick="cerrarModalAdmin()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">✕</button>
+    </div>
+    <div id="adminBody" class="p-5 overflow-y-auto"></div>
+  </div>
+</div>
+
+</body>
+</html>
