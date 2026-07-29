@@ -9,10 +9,10 @@ const CONFIG = {
   // Reemplaza estas URLs por las de "Archivo -> Compartir -> Publicar en la
   // web" de CADA pestaña (Reglamento Interno / Amenidades y Horarios),
   // exportadas como CSV. Cada pestaña tiene su propio gid.
-    CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
-    CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
+CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
+CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
   // URL de la implementación del Web App (Codigo.gs) — la misma para chat y admin.
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbwvkFqPpEqjG6tcx2GhcpU2UG1V3XWlMRkAqQToM-9kdvGv6gl7QGR7AVidE23u4EwdyA/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbxmMvgJIvJgjRueXq2mu8mDYc-x20PUhgPPBkLqy1uw3NccEVlt-XAo532ohqY4J7I6RA/exec"
 };
 
 let reglamentoData = [];
@@ -85,8 +85,11 @@ async function cargarDatos() {
   }
 }
 
+// Sidebar en acordeón: cada categoría/ubicación es un <details> colapsado por
+// default, así el menú no se siente interminable. Se abre el primero solo
+// para dar la pista de que es clickeable.
 function pintarSidebar() {
-  // Reglamento agrupado por Categoria
+  // ---------- Reglamento agrupado por Categoria ----------
   const porCategoria = {};
   reglamentoData.forEach(a => {
     const cat = a.Categoria || "General";
@@ -96,33 +99,94 @@ function pintarSidebar() {
 
   const contReg = document.getElementById("reglamentoList");
   contReg.innerHTML = "";
-  Object.keys(porCategoria).sort().forEach(cat => {
-    const grupo = document.createElement("div");
-    grupo.className = "mb-2";
-    grupo.innerHTML = `<p class="text-[11px] font-bold text-slate-500 px-2 mb-1">${escapeHtml(cat)}</p>`;
+  const categorias = Object.keys(porCategoria).sort();
+  categorias.forEach((cat, idx) => {
+    const details = document.createElement("details");
+    details.className = "grupo-acordeon border border-slate-200 rounded-xl overflow-hidden";
+    if (idx === 0) details.open = true;
+
+    const cantidad = porCategoria[cat].length;
+    const summary = document.createElement("summary");
+    summary.className = "cursor-pointer select-none list-none flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition";
+    summary.innerHTML = `<span class="truncate">${escapeHtml(cat)}</span>
+      <span class="shrink-0 text-[10px] font-normal text-slate-400 ml-2">${cantidad}</span>`;
+    details.appendChild(summary);
+
+    const cuerpo = document.createElement("div");
+    cuerpo.className = "px-1.5 py-1.5 space-y-0.5 bg-white";
     porCategoria[cat]
       .sort((a, b) => (Number(a.Orden) || 0) - (Number(b.Orden) || 0))
       .forEach(a => {
         const btn = document.createElement("button");
-        btn.className = "w-full text-left text-xs text-slate-700 hover:bg-slate-100 rounded-lg px-3 py-2 transition";
+        btn.className = "item-buscable w-full text-left text-xs text-slate-700 hover:bg-slate-100 rounded-lg px-3 py-2 transition";
         btn.textContent = a.Titulo;
+        btn.dataset.texto = (a.Titulo + " " + a.Categoria + " " + a.Contenido).toLowerCase();
         btn.onclick = () => mostrarDetalleArticulo(a);
-        grupo.appendChild(btn);
+        cuerpo.appendChild(btn);
       });
-    contReg.appendChild(grupo);
+    details.appendChild(cuerpo);
+    contReg.appendChild(details);
+  });
+
+  // ---------- Amenidades agrupadas por Ubicación ----------
+  const porUbicacion = {};
+  amenidadesData.forEach(a => {
+    const ubi = a.Ubicacion || "General";
+    if (!porUbicacion[ubi]) porUbicacion[ubi] = [];
+    porUbicacion[ubi].push(a);
   });
 
   const contAme = document.getElementById("amenidadesList");
   contAme.innerHTML = "";
-  amenidadesData.forEach(a => {
-    const btn = document.createElement("button");
-    btn.className = "w-full text-left text-xs text-slate-700 hover:bg-slate-100 rounded-lg px-3 py-2 transition flex items-center justify-between gap-2";
-    btn.innerHTML = `<span class="truncate">${escapeHtml(a.Nombre)}</span>
-      <span class="shrink-0 text-[10px] text-slate-400">${escapeHtml(a.HorarioApertura || "")}-${escapeHtml(a.HorarioCierre || "")}</span>`;
-    btn.onclick = () => mostrarDetalleAmenidad(a);
-    contAme.appendChild(btn);
+  Object.keys(porUbicacion).sort().forEach((ubi, idx) => {
+    const details = document.createElement("details");
+    details.className = "grupo-acordeon border border-slate-200 rounded-xl overflow-hidden";
+    if (idx === 0) details.open = true;
+
+    const summary = document.createElement("summary");
+    summary.className = "cursor-pointer select-none list-none flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition";
+    summary.innerHTML = `<span class="truncate">${escapeHtml(ubi)}</span>
+      <span class="shrink-0 text-[10px] font-normal text-slate-400 ml-2">${porUbicacion[ubi].length}</span>`;
+    details.appendChild(summary);
+
+    const cuerpo = document.createElement("div");
+    cuerpo.className = "px-1.5 py-1.5 space-y-0.5 bg-white";
+    porUbicacion[ubi].forEach(a => {
+      const btn = document.createElement("button");
+      btn.className = "item-buscable w-full text-left text-xs text-slate-700 hover:bg-slate-100 rounded-lg px-3 py-2 transition flex items-center justify-between gap-2";
+      btn.innerHTML = `<span class="truncate">${escapeHtml(a.Nombre)}</span>
+        <span class="shrink-0 text-[10px] text-slate-400">${escapeHtml(a.HorarioApertura || "")}-${escapeHtml(a.HorarioCierre || "")}</span>`;
+      btn.dataset.texto = (a.Nombre + " " + a.Ubicacion + " " + a.Restricciones).toLowerCase();
+      btn.onclick = () => mostrarDetalleAmenidad(a);
+      cuerpo.appendChild(btn);
+    });
+    details.appendChild(cuerpo);
+    contAme.appendChild(details);
   });
 }
+
+// ---------- Buscador del sidebar (filtra en vivo Reglamento + Amenidades) ----------
+function enfocarBuscador() {
+  sidebar.classList.remove("-translate-x-full");
+  overlay.classList.remove("hidden");
+  const input = document.getElementById("buscadorSidebar");
+  input.scrollIntoView({ behavior: "smooth", block: "center" });
+  input.focus();
+}
+
+document.getElementById("buscadorSidebar").addEventListener("input", (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll(".grupo-acordeon").forEach(details => {
+    let algunaVisible = false;
+    details.querySelectorAll(".item-buscable").forEach(item => {
+      const coincide = !q || (item.dataset.texto || "").includes(q);
+      item.classList.toggle("hidden", !coincide);
+      if (coincide) algunaVisible = true;
+    });
+    details.classList.toggle("hidden", !algunaVisible);
+    if (q) details.open = true; // auto-expandir grupos con resultados al buscar
+  });
+});
 
 function mostrarDetalleArticulo(a) {
   document.getElementById("modalDetalleTitulo").textContent = a.Titulo;
@@ -147,6 +211,40 @@ function mostrarDetalleAmenidad(a) {
 }
 
 function cerrarModalDetalle() { document.getElementById("modalDetalle").classList.add("hidden"); }
+
+// Referencia rápida de TODOS los horarios: se arma directo de los datos ya
+// cargados del Sheet (sin llamar a la IA), así siempre es exacta e instantánea
+// — resuelve justo el caso de "¿qué está abierto ahorita?" que la IA no puede
+// contestar bien porque no tiene la hora actual.
+function abrirModalTodosHorarios() {
+  const cont = document.getElementById("todosHorariosBody");
+  const porUbicacion = {};
+  amenidadesData.forEach(a => {
+    const ubi = a.Ubicacion || "General";
+    if (!porUbicacion[ubi]) porUbicacion[ubi] = [];
+    porUbicacion[ubi].push(a);
+  });
+
+  cont.innerHTML = Object.keys(porUbicacion).sort().map(ubi => `
+    <div>
+      <p class="text-[11px] font-bold text-brand-600 uppercase tracking-wide mb-1">${escapeHtml(ubi)}</p>
+      <div class="space-y-1.5">
+        ${porUbicacion[ubi].map(a => `
+          <div class="border border-slate-200 rounded-xl px-3 py-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs font-bold text-slate-800 truncate">${escapeHtml(a.Nombre)}</p>
+              <p class="text-[11px] font-bold text-slate-600 shrink-0">${escapeHtml(a.HorarioApertura || "-")} – ${escapeHtml(a.HorarioCierre || "-")}</p>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(a.DiasDisponibles || "Todos los días")}${a.RequiereReservacion ? " · Reserva: " + escapeHtml(a.RequiereReservacion) : ""}</p>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  document.getElementById("modalTodosHorarios").classList.remove("hidden");
+}
+function cerrarModalTodosHorarios() { document.getElementById("modalTodosHorarios").classList.add("hidden"); }
 
 function escapeHtml(str) {
   return String(str || "")
@@ -215,10 +313,6 @@ document.getElementById("chatForm").addEventListener("submit", (e) => {
   if (!texto) return;
   input.value = "";
   enviarPregunta(texto);
-});
-
-document.querySelectorAll(".quick-action").forEach(btn => {
-  btn.addEventListener("click", () => enviarPregunta(btn.dataset.query));
 });
 
 // ---------- Sidebar móvil ----------
@@ -302,22 +396,55 @@ async function cargarPanelAdmin() {
 
 function pintarPanelReglamento(articulos) {
   const cont = document.getElementById("panelReglamento");
+
+  const porCategoria = {};
+  articulos.forEach(a => {
+    const cat = a.categoria || "General";
+    if (!porCategoria[cat]) porCategoria[cat] = [];
+    porCategoria[cat].push(a);
+  });
+
   cont.innerHTML = `
     <button id="btnNuevoArticulo" class="w-full mb-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2.5 text-xs font-bold transition">+ Nuevo artículo</button>
-    <div class="space-y-2">
-      ${articulos.map(a => `
-        <div class="border border-slate-200 rounded-xl p-3">
-          <p class="text-xs font-bold text-slate-800">${escapeHtml(a.titulo)} <span class="text-slate-400 font-normal">(${escapeHtml(a.categoria)})</span></p>
-          <p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHtml(a.contenido)}</p>
-          <div class="flex gap-2 mt-2">
-            <button class="editArticulo text-[11px] font-bold text-brand-600" data-id="${escapeHtml(a.articuloId)}">Editar</button>
-            <button class="delArticulo text-[11px] font-bold text-red-600" data-id="${escapeHtml(a.articuloId)}">Desactivar</button>
+    <input id="buscadorAdminReglamento" type="text" placeholder="Filtrar por título o categoría…"
+      class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40" />
+    <div id="listaAdminReglamento" class="space-y-2">
+      ${Object.keys(porCategoria).sort().map(cat => `
+        <details class="grupo-acordeon-admin border border-slate-200 rounded-xl overflow-hidden">
+          <summary class="cursor-pointer select-none list-none flex items-center justify-between px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700">
+            <span class="truncate">${escapeHtml(cat)}</span>
+            <span class="text-[10px] font-normal text-slate-400 ml-2">${porCategoria[cat].length}</span>
+          </summary>
+          <div class="p-2 space-y-2">
+            ${porCategoria[cat].map(a => `
+              <div class="item-admin-buscable border border-slate-200 rounded-xl p-3" data-texto="${escapeHtml((a.titulo + " " + a.categoria).toLowerCase())}">
+                <p class="text-xs font-bold text-slate-800">${escapeHtml(a.titulo)}</p>
+                <p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHtml(a.contenido)}</p>
+                <div class="flex gap-2 mt-2">
+                  <button class="editArticulo text-[11px] font-bold text-brand-600" data-id="${escapeHtml(a.articuloId)}">Editar</button>
+                  <button class="delArticulo text-[11px] font-bold text-red-600" data-id="${escapeHtml(a.articuloId)}">Desactivar</button>
+                </div>
+              </div>
+            `).join("")}
           </div>
-        </div>
+        </details>
       `).join("")}
     </div>
   `;
   document.getElementById("btnNuevoArticulo").addEventListener("click", () => formularioArticulo());
+  document.getElementById("buscadorAdminReglamento").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll("#listaAdminReglamento .grupo-acordeon-admin").forEach(details => {
+      let algunaVisible = false;
+      details.querySelectorAll(".item-admin-buscable").forEach(item => {
+        const coincide = !q || (item.dataset.texto || "").includes(q);
+        item.classList.toggle("hidden", !coincide);
+        if (coincide) algunaVisible = true;
+      });
+      details.classList.toggle("hidden", !algunaVisible);
+      if (q) details.open = true;
+    });
+  });
   cont.querySelectorAll(".editArticulo").forEach(btn => {
     const a = articulos.find(x => x.articuloId === btn.dataset.id);
     btn.addEventListener("click", () => formularioArticulo(a));
@@ -373,22 +500,55 @@ function formularioArticulo(a) {
 
 function pintarPanelAmenidades(amenidades) {
   const cont = document.getElementById("panelAmenidades");
+
+  const porUbicacion = {};
+  amenidades.forEach(a => {
+    const ubi = a.ubicacion || "General";
+    if (!porUbicacion[ubi]) porUbicacion[ubi] = [];
+    porUbicacion[ubi].push(a);
+  });
+
   cont.innerHTML = `
     <button id="btnNuevaAmenidad" class="w-full mb-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2.5 text-xs font-bold transition">+ Nueva amenidad</button>
-    <div class="space-y-2">
-      ${amenidades.map(a => `
-        <div class="border border-slate-200 rounded-xl p-3">
-          <p class="text-xs font-bold text-slate-800">${escapeHtml(a.nombre)}</p>
-          <p class="text-xs text-slate-500 mt-1">${escapeHtml(a.horarioApertura)}-${escapeHtml(a.horarioCierre)} · ${escapeHtml(a.diasDisponibles || "Todos los días")}</p>
-          <div class="flex gap-2 mt-2">
-            <button class="editAmenidad text-[11px] font-bold text-brand-600" data-id="${escapeHtml(a.amenidadId)}">Editar</button>
-            <button class="delAmenidad text-[11px] font-bold text-red-600" data-id="${escapeHtml(a.amenidadId)}">Desactivar</button>
+    <input id="buscadorAdminAmenidades" type="text" placeholder="Filtrar por nombre o ubicación…"
+      class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40" />
+    <div id="listaAdminAmenidades" class="space-y-2">
+      ${Object.keys(porUbicacion).sort().map(ubi => `
+        <details class="grupo-acordeon-admin border border-slate-200 rounded-xl overflow-hidden">
+          <summary class="cursor-pointer select-none list-none flex items-center justify-between px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700">
+            <span class="truncate">${escapeHtml(ubi)}</span>
+            <span class="text-[10px] font-normal text-slate-400 ml-2">${porUbicacion[ubi].length}</span>
+          </summary>
+          <div class="p-2 space-y-2">
+            ${porUbicacion[ubi].map(a => `
+              <div class="item-admin-buscable border border-slate-200 rounded-xl p-3" data-texto="${escapeHtml((a.nombre + " " + a.ubicacion).toLowerCase())}">
+                <p class="text-xs font-bold text-slate-800">${escapeHtml(a.nombre)}</p>
+                <p class="text-xs text-slate-500 mt-1">${escapeHtml(a.horarioApertura)}-${escapeHtml(a.horarioCierre)} · ${escapeHtml(a.diasDisponibles || "Todos los días")}</p>
+                <div class="flex gap-2 mt-2">
+                  <button class="editAmenidad text-[11px] font-bold text-brand-600" data-id="${escapeHtml(a.amenidadId)}">Editar</button>
+                  <button class="delAmenidad text-[11px] font-bold text-red-600" data-id="${escapeHtml(a.amenidadId)}">Desactivar</button>
+                </div>
+              </div>
+            `).join("")}
           </div>
-        </div>
+        </details>
       `).join("")}
     </div>
   `;
   document.getElementById("btnNuevaAmenidad").addEventListener("click", () => formularioAmenidad());
+  document.getElementById("buscadorAdminAmenidades").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll("#listaAdminAmenidades .grupo-acordeon-admin").forEach(details => {
+      let algunaVisible = false;
+      details.querySelectorAll(".item-admin-buscable").forEach(item => {
+        const coincide = !q || (item.dataset.texto || "").includes(q);
+        item.classList.toggle("hidden", !coincide);
+        if (coincide) algunaVisible = true;
+      });
+      details.classList.toggle("hidden", !algunaVisible);
+      if (q) details.open = true;
+    });
+  });
   cont.querySelectorAll(".editAmenidad").forEach(btn => {
     const a = amenidades.find(x => x.amenidadId === btn.dataset.id);
     btn.addEventListener("click", () => formularioAmenidad(a));
