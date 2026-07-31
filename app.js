@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzlnnvlit_J2O_5421h6dk3lCedm0fTL_UBcJ2YSS19v7ZvPWUZnxou88kyWnYUPjWy8Q/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzWJtq1jtNtPm-8z3G4ZgV727MJWaHCvQLSXKGlDeHM7JK5tYw6UOyFaBuUmYSL0SUD/exec"
 };
 
 let reglamentoData = [];
@@ -618,7 +618,6 @@ async function ejecutarConsultaDepto() {
     <div class="border rounded-xl p-3 ${colorMoroso}">
       <p class="text-xs font-bold">${tituloMoroso}</p>
       <p class="text-xs mt-1">${escapeHtml(m.mensaje)}</p>
-      ${m.accion === "bloqueado" ? `<p class="text-xs mt-1 font-bold">Indícale al residente que debe resolver su adeudo con la Administración — no se le puede dejar pasar por esta vez.</p>` : ""}
       ${m.tieneConvenio && m.tieneConvenio.toLowerCase() === "si" ? `<p class="text-xs mt-1"><b>Tiene convenio de pago:</b> ${escapeHtml(m.detalleConvenio || "Sin detalle registrado")}</p>` : ""}
     </div>
     <div class="border border-slate-200 rounded-xl p-3 mt-2">
@@ -781,6 +780,7 @@ async function registrarSalidaClick(registroId) {
     alert("No se pudo registrar la salida: " + ((data && data.error) || "error desconocido"));
     return;
   }
+  alert("✅ Salida registrada correctamente" + (data.fechaSalida ? " (" + data.fechaSalida + ")" : "") + ".");
   cargarRegistrosActivos(); // refresca la lista quitando el que ya salió
 }
 
