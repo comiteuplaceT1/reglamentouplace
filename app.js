@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/library/d/1UWH6aHgAmUR1_XUuqcTdQclYXp8wQCEdGuTGK530Z_TiaLSdMmPcUYWn/4"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbyYi_rh8gDE-nlZVN0BNURME5_dy2XuXFRr_U9iBtZXYsq7NW6b5IvE9afGCiVmuJf27g/exec"
 };
 
 let reglamentoData = [];
