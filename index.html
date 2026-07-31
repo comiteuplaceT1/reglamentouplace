@@ -60,13 +60,25 @@
       </button>
     </div>
 
+    <!-- Identidad del guardia en turno -->
+    <div id="badgeGuardia" class="hidden mx-4 mt-3 flex items-center justify-between gap-2 bg-slate-800 text-white rounded-xl px-3 py-2">
+      <p class="text-[11px] font-bold truncate">👤 <span id="badgeGuardiaTexto"></span></p>
+      <button onclick="cambiarGuardia()" class="shrink-0 text-[10px] font-bold text-slate-300 hover:text-white underline">Cambiar</button>
+    </div>
+
     <!-- Quick actions -->
-    <div class="p-4 space-y-2 border-b border-slate-200">
-      <button onclick="abrirModalTodosHorarios()" class="w-full flex items-center gap-2 text-sm font-bold bg-brand-700 hover:bg-brand-800 text-white rounded-xl px-3 py-3 shadow-md shadow-brand-700/30 transition active:scale-95">
-        📋 <span>Ver todos los horarios</span>
+    <div class="p-4 grid grid-cols-2 gap-2 border-b border-slate-200">
+      <button onclick="abrirModalTodosHorarios()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-brand-700 hover:bg-brand-800 text-white rounded-xl px-2 py-3 shadow-md shadow-brand-700/30 transition active:scale-95">
+        📋 <span>Horarios</span>
       </button>
-      <button onclick="enfocarBuscador()" class="w-full flex items-center gap-2 text-sm font-medium bg-slate-600 hover:bg-slate-700 text-white rounded-xl px-3 py-2.5 shadow-sm shadow-slate-600/30 transition">
-        🔎 <span>Buscar una regla o amenidad</span>
+      <button onclick="abrirModalConsultarDepto()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-2 py-3 shadow-md shadow-emerald-600/30 transition active:scale-95">
+        🏠 <span>Consultar depto</span>
+      </button>
+      <button onclick="abrirModalIncidente()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl px-2 py-3 shadow-md shadow-amber-600/30 transition active:scale-95">
+        🚨 <span>Reportar incidente</span>
+      </button>
+      <button onclick="enfocarBuscador()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-slate-600 hover:bg-slate-700 text-white rounded-xl px-2 py-3 shadow-md shadow-slate-600/30 transition active:scale-95">
+        🔎 <span>Buscar regla</span>
       </button>
     </div>
 
@@ -142,7 +154,89 @@
   </main>
 </div>
 
-<script src="app.js?v=20260729a"></script>
+<script src="app.js?v=20260731a"></script>
+
+<!-- Modal: Identidad del guardia (obligatoria al abrir la sesión) -->
+<div id="modalIdentidad" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden">
+    <div class="px-5 py-4 bg-slate-900 border-b border-slate-800">
+      <h3 class="text-sm font-bold text-white">👤 Identifícate para empezar</h3>
+      <p class="text-[11px] text-slate-300 mt-1">Tus consultas, incidentes y registros quedarán a tu nombre en la bitácora.</p>
+    </div>
+    <div class="p-5">
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Tu nombre</label>
+      <input id="fIdentidadNombre" type="text" placeholder="ej. Juan Pérez"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40" />
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Tu puesto</label>
+      <select id="fIdentidadPuesto" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40">
+        <option>Guardia de Turno</option>
+        <option>Jefe de Turno</option>
+        <option>Recepción</option>
+        <option>Monitorista CCTV</option>
+        <option>Otro</option>
+      </select>
+      <p id="errorIdentidad" class="hidden text-red-600 text-xs mb-2">Escribe tu nombre para continuar.</p>
+      <button onclick="guardarIdentidad()" class="w-full bg-brand-600 hover:bg-brand-700 text-white rounded-xl py-3 text-sm font-bold transition">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Consultar depto (morosidad + límite de invitados por amenidad) -->
+<div id="modalConsultarDepto" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90dvh]">
+    <div class="px-5 py-4 bg-emerald-700 border-b border-emerald-800 flex items-center justify-between">
+      <h3 class="text-sm font-bold text-white">🏠 Consultar depto</h3>
+      <button onclick="cerrarModalConsultarDepto()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto">
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Número de depto</label>
+      <input id="fConsultaDepto" type="text" placeholder="ej. 1203"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">¿A qué amenidad viene? (opcional)</label>
+      <select id="fConsultaAmenidad" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"></select>
+
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Número de invitados (opcional)</label>
+      <input id="fConsultaInvitados" type="number" min="0" placeholder="0"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+
+      <button onclick="ejecutarConsultaDepto()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-3 text-sm font-bold transition mb-3">Verificar</button>
+
+      <div id="resultadoConsultaDepto" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Registrar incidente -->
+<div id="modalIncidente" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90dvh]">
+    <div class="px-5 py-4 bg-amber-600 border-b border-amber-700 flex items-center justify-between">
+      <h3 class="text-sm font-bold text-white">🚨 Reportar incidente</h3>
+      <button onclick="cerrarModalIncidente()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto">
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Depto involucrado</label>
+      <input id="fIncidenteDepto" type="text" placeholder="ej. 1203"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-amber-500/40" />
+
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">¿Qué pasó?</label>
+      <textarea id="fIncidenteDescripcion" rows="3" placeholder="Describe el incidente con el mayor detalle posible"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-amber-500/40"></textarea>
+
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Regla o artículo que se violó (opcional)</label>
+      <input id="fIncidenteRegla" type="text" placeholder="ej. Art. 35 — mascota suelta en área común"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-amber-500/40" />
+
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Foto de evidencia (opcional)</label>
+      <input id="fIncidenteFoto" type="file" accept="image/*" capture="environment"
+        class="w-full text-xs mb-2" />
+      <img id="previewIncidenteFoto" class="hidden w-full rounded-xl mb-3 max-h-40 object-cover" />
+
+      <button onclick="enviarIncidente()" class="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl py-3 text-sm font-bold transition mb-2">Registrar incidente</button>
+      <div id="resultadoIncidente"></div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal: Detalle de artículo / amenidad (al hacer click en el sidebar) -->
 <div id="modalDetalle" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
