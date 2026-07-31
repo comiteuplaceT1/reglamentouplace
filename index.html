@@ -63,7 +63,10 @@
     <!-- Identidad del guardia en turno -->
     <div id="badgeGuardia" class="hidden mx-4 mt-3 flex items-center justify-between gap-2 bg-slate-800 text-white rounded-xl px-3 py-2">
       <p class="text-[11px] font-bold truncate">👤 <span id="badgeGuardiaTexto"></span></p>
-      <button onclick="cambiarGuardia()" class="shrink-0 text-[10px] font-bold text-slate-300 hover:text-white underline">Cambiar</button>
+      <div class="flex items-center gap-2 shrink-0">
+        <button onclick="cambiarGuardia()" class="text-[10px] font-bold text-slate-300 hover:text-white underline">Cambiar</button>
+        <button onclick="cerrarSesionGuardia()" class="text-[10px] font-bold text-red-300 hover:text-red-200 underline">Cerrar sesión</button>
+      </div>
     </div>
 
     <!-- Quick actions -->
@@ -88,16 +91,22 @@
         class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-400 transition" />
     </div>
 
-    <!-- Contenedor scrollable: Reglamento por categoría + Amenidades, en acordeón -->
-    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      <div>
-        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide px-1 mb-1">Reglamento Interno</p>
-        <div id="reglamentoList" class="space-y-1.5"></div>
-      </div>
-      <div>
-        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide px-1 mb-1">Amenidades y Horarios</p>
-        <div id="amenidadesList" class="space-y-1.5"></div>
-      </div>
+    <!-- Contenedor scrollable: dos submenús de nivel superior, colapsados por default -->
+    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <details class="grupo-acordeon-nivel1 border border-slate-200 rounded-xl overflow-hidden">
+        <summary class="cursor-pointer select-none list-none flex items-center justify-between px-3 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition">
+          <span>📖 Reglamento Interno</span>
+          <span id="countReglamento" class="text-[10px] font-normal text-slate-300 ml-2"></span>
+        </summary>
+        <div id="reglamentoList" class="p-2 space-y-1.5 bg-white"></div>
+      </details>
+      <details class="grupo-acordeon grupo-acordeon-nivel1 border border-slate-200 rounded-xl overflow-hidden">
+        <summary class="cursor-pointer select-none list-none flex items-center justify-between px-3 py-2.5 bg-brand-700 hover:bg-brand-800 text-white text-xs font-bold transition">
+          <span>🏊 Amenidades</span>
+          <span id="countAmenidades" class="text-[10px] font-normal text-brand-100 ml-2"></span>
+        </summary>
+        <div id="amenidadesList" class="p-2 space-y-1.5 bg-white"></div>
+      </details>
     </div>
 
     <!-- Panel admin (editar reglamento/amenidades, protegido con PIN) -->
@@ -270,7 +279,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260731b"></script>
+<script src="app.js?v=20260731d"></script>
 
 </body>
 </html>

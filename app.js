@@ -100,6 +100,51 @@ async function cargarDatos() {
   }
 }
 
+// Mapeo de Categoria (tal cual está en el Sheet) -> Grupo amplio para el
+// submenú del sidebar. Si mañana el Comité agrega una Categoria nueva que no
+// está aquí, cae en "Otros" (visible al final) en vez de tronar o desaparecer.
+const GRUPOS_CATEGORIA = {
+  "Fundamento y Aplicación": "Fundamento y Definiciones",
+  "Definiciones Clave": "Fundamento y Definiciones",
+  "Derechos y Obligaciones": "Fundamento y Definiciones",
+
+  "Ruido y Convivencia": "Convivencia y Seguridad",
+  "Mascotas": "Convivencia y Seguridad",
+  "Personal de Seguridad Privada": "Convivencia y Seguridad",
+  "Armas": "Convivencia y Seguridad",
+  "Acceso de Visitas y Personal de Servicio": "Convivencia y Seguridad",
+
+  "Mudanzas, Obras y Adecuaciones": "Obras y Espacios Privativos",
+  "Construcción y Adecuaciones": "Obras y Espacios Privativos",
+  "Estacionamientos": "Obras y Espacios Privativos",
+  "Bodegas y Terrazas": "Obras y Espacios Privativos",
+  "Fachadas y Persianas": "Obras y Espacios Privativos",
+  "Manejo de Basura": "Obras y Espacios Privativos",
+
+  "Régimen Disciplinario": "Gobierno, Sanciones y Conflictos",
+  "Controversias entre Condóminos": "Gobierno, Sanciones y Conflictos",
+  "Comité de Vigilancia": "Gobierno, Sanciones y Conflictos",
+  "Administración": "Gobierno, Sanciones y Conflictos",
+
+  "Amenidades — Base Legal": "Amenidades (Reglas de Uso)",
+  "Amenidades — Acceso y Morosidad": "Amenidades (Reglas de Uso)",
+  "Amenidades — Invitados": "Amenidades (Reglas de Uso)",
+  "Amenidades — Entrenadores y Proveedores": "Amenidades (Reglas de Uso)",
+  "Amenidades — Prohibiciones Generales": "Amenidades (Reglas de Uso)",
+  "Amenidades — Sanciones y Reincidencia": "Amenidades (Reglas de Uso)"
+};
+const ORDEN_GRUPOS = [
+  "Fundamento y Definiciones",
+  "Convivencia y Seguridad",
+  "Obras y Espacios Privativos",
+  "Gobierno, Sanciones y Conflictos",
+  "Amenidades (Reglas de Uso)",
+  "Otros"
+];
+function obtenerGrupoDeCategoria(categoria) {
+  return GRUPOS_CATEGORIA[String(categoria || "").trim()] || "Otros";
+}
+
 // Orden de categorías: en vez de alfabético, usamos el Orden mínimo de sus
 // artículos — así el menú sigue la secuencia lógica original del reglamento
 // (fundamento -> convivencia -> seguridad -> sanciones -> amenidades) en vez
@@ -116,69 +161,75 @@ function ordenarClavesPorOrdenMinimo(mapaGrupos, obtenerOrden) {
 // default. Los ítems de amenidades muestran SOLO nombre + horario (apilado,
 // sin recortar el nombre) — el resto de la info vive en el detalle/modal.
 function pintarSidebar() {
-  // ---------- Reglamento agrupado por Categoria ----------
-  const porCategoria = {};
+  // ---------- Reglamento agrupado por Grupo (amplio) > Categoria (subtítulo) ----------
+  const porGrupo = {}; // Grupo -> { Categoria -> [artículos] }
   reglamentoData.forEach(a => {
     const cat = a.Categoria || "General";
-    if (!porCategoria[cat]) porCategoria[cat] = [];
-    porCategoria[cat].push(a);
+    const grupo = obtenerGrupoDeCategoria(cat);
+    if (!porGrupo[grupo]) porGrupo[grupo] = {};
+    if (!porGrupo[grupo][cat]) porGrupo[grupo][cat] = [];
+    porGrupo[grupo][cat].push(a);
   });
 
   const contReg = document.getElementById("reglamentoList");
   contReg.innerHTML = "";
-  const categorias = ordenarClavesPorOrdenMinimo(porCategoria, a => Number(a.Orden) || 0);
-  categorias.forEach((cat, idx) => {
+  // Respeta el orden editorial definido en ORDEN_GRUPOS; cualquier grupo
+  // inesperado (no debería pasar, pero por si acaso) se agrega al final.
+  const gruposPresentes = ORDEN_GRUPOS.filter(g => porGrupo[g]);
+  Object.keys(porGrupo).forEach(g => { if (!gruposPresentes.includes(g)) gruposPresentes.push(g); });
+
+  gruposPresentes.forEach(grupo => {
+    const categoriasDelGrupo = porGrupo[grupo];
+    const totalArticulos = Object.values(categoriasDelGrupo).reduce((sum, arr) => sum + arr.length, 0);
+
     const details = document.createElement("details");
     details.className = "grupo-acordeon border border-slate-200 rounded-xl overflow-hidden";
-    if (idx === 0) details.open = true;
-
-    const cantidad = porCategoria[cat].length;
     const summary = document.createElement("summary");
     summary.className = "cursor-pointer select-none list-none flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition";
-    summary.innerHTML = `<span class="truncate">${escapeHtml(cat)}</span>
-      <span class="shrink-0 text-[10px] font-normal text-slate-400 ml-2">${cantidad}</span>`;
+    summary.innerHTML = `<span class="truncate">${escapeHtml(grupo)}</span>
+      <span class="shrink-0 text-[10px] font-normal text-slate-400 ml-2">${totalArticulos}</span>`;
     details.appendChild(summary);
 
     const cuerpo = document.createElement("div");
-    cuerpo.className = "px-1.5 py-1.5 space-y-0.5 bg-white";
-    porCategoria[cat]
-      .sort((a, b) => (Number(a.Orden) || 0) - (Number(b.Orden) || 0))
-      .forEach(a => {
-        const btn = document.createElement("button");
-        btn.className = "item-buscable w-full text-left text-xs text-slate-700 hover:bg-slate-100 rounded-lg px-3 py-2 transition";
-        btn.textContent = a.Titulo;
-        btn.dataset.texto = (a.Titulo + " " + a.Categoria + " " + a.Contenido).toLowerCase();
-        btn.onclick = () => mostrarDetalleArticulo(a);
-        cuerpo.appendChild(btn);
-      });
+    cuerpo.className = "px-2 py-2 space-y-3 bg-white";
+
+    const categoriasOrdenadas = ordenarClavesPorOrdenMinimo(categoriasDelGrupo, a => Number(a.Orden) || 0);
+    categoriasOrdenadas.forEach(cat => {
+      // Subtítulo de la categoría original — separador visual, ya NO es un
+      // acordeón propio (para no meter un tercer nivel de clics).
+      const label = document.createElement("p");
+      label.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1";
+      label.textContent = cat;
+      cuerpo.appendChild(label);
+
+      const lista = document.createElement("div");
+      lista.className = "space-y-0.5 mb-1";
+      categoriasDelGrupo[cat]
+        .sort((a, b) => (Number(a.Orden) || 0) - (Number(b.Orden) || 0))
+        .forEach(a => {
+          const btn = document.createElement("button");
+          btn.className = "item-buscable w-full text-left text-xs text-slate-700 hover:bg-slate-100 rounded-lg px-3 py-2 transition";
+          btn.textContent = a.Titulo;
+          btn.dataset.texto = (a.Titulo + " " + a.Categoria + " " + a.Contenido).toLowerCase();
+          btn.onclick = () => mostrarDetalleArticulo(a);
+          lista.appendChild(btn);
+        });
+      cuerpo.appendChild(lista);
+    });
+
     details.appendChild(cuerpo);
     contReg.appendChild(details);
   });
 
-  // ---------- Amenidades agrupadas por Ubicación ----------
-  const porUbicacion = {};
-  amenidadesData.forEach(a => {
-    const ubi = a.Ubicacion || "General";
-    if (!porUbicacion[ubi]) porUbicacion[ubi] = [];
-    porUbicacion[ubi].push(a);
-  });
-
+  // ---------- Amenidades: lista PLANA, una por amenidad (ya no por piso/Ubicación) ----------
+  // El submenú "🏊 Amenidades" es ahora el nivel de agrupación; adentro cada
+  // amenidad es su propio renglón — no hay una segunda capa por Ubicación.
   const contAme = document.getElementById("amenidadesList");
   contAme.innerHTML = "";
-  Object.keys(porUbicacion).sort().forEach((ubi, idx) => {
-    const details = document.createElement("details");
-    details.className = "grupo-acordeon border border-slate-200 rounded-xl overflow-hidden";
-    if (idx === 0) details.open = true;
-
-    const summary = document.createElement("summary");
-    summary.className = "cursor-pointer select-none list-none flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition";
-    summary.innerHTML = `<span class="truncate">${escapeHtml(ubi)}</span>
-      <span class="shrink-0 text-[10px] font-normal text-slate-400 ml-2">${porUbicacion[ubi].length}</span>`;
-    details.appendChild(summary);
-
-    const cuerpo = document.createElement("div");
-    cuerpo.className = "px-1.5 py-1.5 space-y-0.5 bg-white";
-    porUbicacion[ubi].forEach(a => {
+  amenidadesData
+    .slice()
+    .sort((a, b) => String(a.Nombre || "").localeCompare(String(b.Nombre || ""), "es"))
+    .forEach(a => {
       const btn = document.createElement("button");
       // Nombre y horario APILADOS (no en la misma línea) para que el nombre
       // nunca se recorte y solo se agregue el dato de horario, nada más.
@@ -187,11 +238,13 @@ function pintarSidebar() {
         <div class="text-[10px] text-slate-400 mt-0.5">${escapeHtml(a.HorarioApertura || "")} – ${escapeHtml(a.HorarioCierre || "")}</div>`;
       btn.dataset.texto = (a.Nombre + " " + a.Ubicacion + " " + a.Restricciones).toLowerCase();
       btn.onclick = () => mostrarDetalleAmenidad(a);
-      cuerpo.appendChild(btn);
+      contAme.appendChild(btn);
     });
-    details.appendChild(cuerpo);
-    contAme.appendChild(details);
-  });
+
+  const elCountReg = document.getElementById("countReglamento");
+  if (elCountReg) elCountReg.textContent = reglamentoData.length;
+  const elCountAme = document.getElementById("countAmenidades");
+  if (elCountAme) elCountAme.textContent = amenidadesData.length;
 }
 
 // ---------- Buscador del sidebar (filtra en vivo Reglamento + Amenidades) ----------
@@ -214,6 +267,13 @@ document.getElementById("buscadorSidebar").addEventListener("input", (e) => {
     });
     details.classList.toggle("hidden", !algunaVisible);
     if (q) details.open = true; // auto-expandir grupos con resultados al buscar
+  });
+  // Submenú de nivel superior (Reglamento Interno / Amenidades): se abre si
+  // tiene algo visible adentro, sin importar cuántos niveles de anidación tenga.
+  document.querySelectorAll(".grupo-acordeon-nivel1").forEach(top => {
+    const algunaVisible = !!top.querySelector(".item-buscable:not(.hidden)");
+    if (q && algunaVisible) top.open = true;
+    if (!q) top.open = false; // al borrar la búsqueda, todo vuelve a colapsado
   });
 });
 
@@ -323,6 +383,23 @@ function guardarIdentidad() {
   document.getElementById("modalIdentidad").classList.add("hidden");
 }
 function cambiarGuardia() {
+  abrirModalIdentidad();
+}
+
+// Cierre de sesión explícito para el cambio de turno: el guardia que se va
+// presiona esto antes de entregar el equipo/tablet, así el que entra
+// forzosamente tiene que registrarse con SU nombre antes de poder usar el
+// chat o cualquier botón (no queda nada a nombre del guardia anterior).
+function cerrarSesionGuardia() {
+  if (!guardNombre) return;
+  if (!confirm("¿Cerrar la sesión de " + guardNombre + "? El siguiente guardia deberá identificarse para continuar.")) return;
+  guardNombre = "";
+  guardPuesto = "";
+  localStorage.removeItem("uplace_guard_nombre");
+  localStorage.removeItem("uplace_guard_puesto");
+  historialChat = []; // no arrastrar el hilo de conversación de un guardia al otro
+  messagesEl.innerHTML = "";
+  actualizarBadgeGuardia();
   abrirModalIdentidad();
 }
 
