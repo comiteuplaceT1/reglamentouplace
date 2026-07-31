@@ -75,10 +75,16 @@
         📋 <span>Horarios</span>
       </button>
       <button onclick="abrirModalConsultarDepto()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-2 py-3 shadow-md shadow-emerald-600/30 transition active:scale-95">
-        🏠 <span>Consultar depto</span>
+        🏠 <span>Consultar / Registrar Depto</span>
       </button>
       <button onclick="abrirModalIncidente()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl px-2 py-3 shadow-md shadow-amber-600/30 transition active:scale-95">
         🚨 <span>Reportar incidente</span>
+      </button>
+      <button onclick="abrirModalRegistrarSalida()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-2 py-3 shadow-md shadow-indigo-600/30 transition active:scale-95">
+        🚪 <span>Registrar salida</span>
+      </button>
+      <button onclick="abrirModalVerificarPaqueteria()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-2 py-3 shadow-md shadow-teal-600/30 transition active:scale-95">
+        📦 <span>Verificar Paquetería</span>
       </button>
       <button onclick="enfocarBuscador()" class="flex flex-col items-center justify-center gap-1 text-[11px] font-bold bg-slate-600 hover:bg-slate-700 text-white rounded-xl px-2 py-3 shadow-md shadow-slate-600/30 transition active:scale-95">
         🔎 <span>Buscar regla</span>
@@ -172,8 +178,12 @@
     </div>
     <div class="p-5">
       <label class="block text-[11px] font-bold text-slate-500 mb-1">Tu nombre</label>
-      <input id="fIdentidadNombre" type="text" placeholder="ej. Juan Pérez"
-        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40" />
+      <select id="fIdentidadNombreSelect" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-brand-500/40">
+        <option value="">Selecciona tu nombre…</option>
+        <option value="__otro__">Otro / no aparezco en la lista</option>
+      </select>
+      <input id="fIdentidadNombreManual" type="text" placeholder="Escribe tu nombre"
+        class="hidden w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40" />
       <label class="block text-[11px] font-bold text-slate-500 mb-1">Tu puesto</label>
       <select id="fIdentidadPuesto" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40">
         <option>Guardia de Turno</option>
@@ -188,11 +198,11 @@
   </div>
 </div>
 
-<!-- Modal: Consultar depto (morosidad + límite de invitados por amenidad) -->
+<!-- Modal: Consultar / Registrar Depto (morosidad + huellas + límite de invitados) -->
 <div id="modalConsultarDepto" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
   <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90dvh]">
     <div class="px-5 py-4 bg-emerald-700 border-b border-emerald-800 flex items-center justify-between">
-      <h3 class="text-sm font-bold text-white">🏠 Consultar depto</h3>
+      <h3 class="text-sm font-bold text-white">🏠 Consultar / Registrar Depto</h3>
       <button onclick="cerrarModalConsultarDepto()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">✕</button>
     </div>
     <div class="p-5 overflow-y-auto">
@@ -202,6 +212,10 @@
 
       <label class="block text-[11px] font-bold text-slate-500 mb-1">¿A qué amenidad viene? (opcional)</label>
       <select id="fConsultaAmenidad" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"></select>
+
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Nombre de quien se presenta (opcional)</label>
+      <input id="fConsultaNombreResidente" type="text" placeholder="ej. Juan Pérez"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
 
       <label class="block text-[11px] font-bold text-slate-500 mb-1">Residentes adicionales del mismo depto (opcional)</label>
       <input id="fConsultaResidentes" type="number" min="0" placeholder="0"
@@ -219,6 +233,37 @@
       <button onclick="ejecutarConsultaDepto()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-3 text-sm font-bold transition mb-3">Verificar</button>
 
       <div id="resultadoConsultaDepto" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Registrar salida (marca FechaSalida en Bitacora_Reservaciones) -->
+<div id="modalRegistrarSalida" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90dvh]">
+    <div class="px-5 py-4 bg-indigo-700 border-b border-indigo-800 flex items-center justify-between">
+      <h3 class="text-sm font-bold text-white">🚪 Registrar salida</h3>
+      <button onclick="cerrarModalRegistrarSalida()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto">
+      <p class="text-[11px] text-slate-500 mb-3">Registros activos (sin salida marcada). Toca "Registrar salida" cuando el residente se retire de la amenidad.</p>
+      <div id="listaRegistrosActivos" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Verificar Paquetería (solo morosidad, para Lobby/Recepción) -->
+<div id="modalVerificarPaqueteria" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden">
+    <div class="px-5 py-4 bg-teal-700 border-b border-teal-800 flex items-center justify-between">
+      <h3 class="text-sm font-bold text-white">📦 Verificar Paquetería</h3>
+      <button onclick="cerrarModalVerificarPaqueteria()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">✕</button>
+    </div>
+    <div class="p-5">
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Número de depto</label>
+      <input id="fPaqueteriaDepto" type="text" placeholder="ej. 1203"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-teal-500/40" />
+      <button onclick="ejecutarVerificarPaqueteria()" class="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-3 text-sm font-bold transition mb-3">Verificar</button>
+      <div id="resultadoVerificarPaqueteria"></div>
     </div>
   </div>
 </div>
@@ -288,7 +333,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260731f"></script>
+<script src="app.js?v=20260731h"></script>
 
 </body>
 </html>

@@ -7,11 +7,12 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbyYi_rh8gDE-nlZVN0BNURME5_dy2XuXFRr_U9iBtZXYsq7NW6b5IvE9afGCiVmuJf27g/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzlnnvlit_J2O_5421h6dk3lCedm0fTL_UBcJ2YSS19v7ZvPWUZnxou88kyWnYUPjWy8Q/exec"
 };
 
 let reglamentoData = [];
 let amenidadesData = [];
+let guardiasData = []; // se llena desde el Sheet (tab "Guardias") para el selector del modal de identidad
 let adminPin = null;
 
 // Identidad del guardia en esta sesión de navegador (persiste entre recargas
@@ -98,6 +99,33 @@ async function cargarDatos() {
     console.error("Error cargando datos:", err);
     document.getElementById("edificioSummary").textContent = "Error al cargar datos";
   }
+}
+
+// Lista de guardias para el selector del modal de identidad (en vez de texto
+// libre, para evitar variantes del mismo nombre en la bitácora). Si la hoja
+// "Guardias" está vacía o no existe todavía, el select solo muestra la
+// opción "Otro" y cae en el input manual — no bloquea el inicio de sesión.
+async function cargarGuardias() {
+  try {
+    const data = await llamarBackend({ accion: "listar_guardias" });
+    guardiasData = (data && data.ok && Array.isArray(data.guardias)) ? data.guardias : [];
+  } catch (e) {
+    guardiasData = [];
+  }
+  const select = document.getElementById("fIdentidadNombreSelect");
+  // Quita opciones de guardias previas (deja "Selecciona…" y "Otro")
+  Array.from(select.querySelectorAll("option[data-guardia]")).forEach(o => o.remove());
+  guardiasData
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    .forEach(g => {
+      const opt = document.createElement("option");
+      opt.value = g.nombre;
+      opt.dataset.guardia = "1";
+      opt.dataset.puesto = g.puesto || "";
+      opt.textContent = g.nombre + (g.puesto ? " — " + g.puesto : "");
+      select.insertBefore(opt, select.querySelector('option[value="__otro__"]'));
+    });
 }
 
 // Mapeo de Categoria (tal cual está en el Sheet) -> Grupo amplio para el
@@ -358,17 +386,53 @@ function actualizarBadgeGuardia() {
 }
 
 function abrirModalIdentidad() {
-  document.getElementById("fIdentidadNombre").value = guardNombre || "";
+  const select = document.getElementById("fIdentidadNombreSelect");
+  const manual = document.getElementById("fIdentidadNombreManual");
+  // Si el nombre guardado coincide con alguien de la lista, lo preselecciona;
+  // si no está en la lista (guardia nuevo o "Otro"), usa el campo manual.
+  const opcionExistente = guardNombre && Array.from(select.options).some(o => o.value === guardNombre && o.dataset.guardia);
+  if (opcionExistente) {
+    select.value = guardNombre;
+    manual.classList.add("hidden");
+    manual.value = "";
+  } else if (guardNombre) {
+    select.value = "__otro__";
+    manual.classList.remove("hidden");
+    manual.value = guardNombre;
+  } else {
+    select.value = "";
+    manual.classList.add("hidden");
+    manual.value = "";
+  }
   document.getElementById("fIdentidadPuesto").value = guardPuesto || "Guardia de Turno";
   document.getElementById("modalIdentidad").classList.remove("hidden");
 }
+// Al elegir un nombre de la lista, autocompleta su puesto registrado (el
+// guardia lo puede cambiar si ese día cubre otra función); al elegir "Otro"
+// se revela el campo de texto libre.
+document.getElementById("fIdentidadNombreSelect").addEventListener("change", (e) => {
+  const opt = e.target.selectedOptions[0];
+  const manual = document.getElementById("fIdentidadNombreManual");
+  if (e.target.value === "__otro__") {
+    manual.classList.remove("hidden");
+    manual.value = "";
+    manual.focus();
+  } else {
+    manual.classList.add("hidden");
+    manual.value = "";
+    if (opt && opt.dataset.puesto) document.getElementById("fIdentidadPuesto").value = opt.dataset.puesto;
+  }
+});
 function cerrarModalIdentidad() {
   // Solo se puede cerrar si ya hay una identidad guardada (no se puede usar
   // el chat de forma anónima, para que las consultas queden a nombre de alguien).
   if (guardNombre) document.getElementById("modalIdentidad").classList.add("hidden");
 }
 function guardarIdentidad() {
-  const nombre = document.getElementById("fIdentidadNombre").value.trim();
+  const select = document.getElementById("fIdentidadNombreSelect");
+  const nombre = (select.value === "__otro__")
+    ? document.getElementById("fIdentidadNombreManual").value.trim()
+    : select.value.trim();
   const puesto = document.getElementById("fIdentidadPuesto").value.trim();
   if (!nombre) {
     document.getElementById("errorIdentidad").classList.remove("hidden");
@@ -501,6 +565,7 @@ function poblarSelectAmenidades() {
 
 function abrirModalConsultarDepto() {
   document.getElementById("fConsultaDepto").value = "";
+  document.getElementById("fConsultaNombreResidente").value = "";
   document.getElementById("fConsultaResidentes").value = "";
   document.getElementById("fConsultaInvitados").value = "";
   document.getElementById("fConsultaNotas").value = "";
@@ -515,6 +580,7 @@ let ultimaConsultaDepto = null; // guarda el resultado para poder "registrar ing
 async function ejecutarConsultaDepto() {
   const depto = document.getElementById("fConsultaDepto").value.trim();
   const amenidadId = document.getElementById("fConsultaAmenidad").value;
+  const nombreQuienRegistra = document.getElementById("fConsultaNombreResidente").value.trim();
   const numResidentes = document.getElementById("fConsultaResidentes").value.trim();
   const numInvitados = document.getElementById("fConsultaInvitados").value.trim();
   const notas = document.getElementById("fConsultaNotas").value.trim();
@@ -537,31 +603,32 @@ async function ejecutarConsultaDepto() {
     resultado.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml(data.error || "Error al consultar.")}</p>`;
     return;
   }
-  ultimaConsultaDepto = { depto, amenidadId, numResidentes, numInvitados, notas, data };
+  ultimaConsultaDepto = { depto, amenidadId, nombreQuienRegistra, numResidentes, numInvitados, notas, data };
 
   const m = data.moroso;
+  // Política sin tolerancia: un moroso se bloquea SIEMPRE (ya no existe el
+  // "primer aviso, se le deja pasar" — se dejó el color ámbar solo por si
+  // llegara a verse un depto marcado "Moroso" sin acción resuelta todavía).
   let colorMoroso = "bg-emerald-50 border-emerald-200 text-emerald-800";
   let tituloMoroso = "✅ Al corriente";
-  if (m.accion === "aviso") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ MOROSO — primer aviso, se le permite pasar"; }
-  if (m.accion === "bloqueado") { colorMoroso = "bg-red-50 border-red-300 text-red-800"; tituloMoroso = "🚫 MOROSO — BLOQUEADO, no permitir acceso"; }
-  else if (m.estatus && m.estatus.toLowerCase() === "moroso" && m.accion === "ninguna") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ Moroso"; }
+  if (m.accion === "bloqueado") { colorMoroso = "bg-red-50 border-red-300 text-red-800"; tituloMoroso = "🚫 MOROSO — NO SE PERMITE EL ACCESO"; }
+  else if (m.estatus && m.estatus.toLowerCase() === "moroso") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ Moroso"; }
 
   let html = `
     <div class="border rounded-xl p-3 ${colorMoroso}">
       <p class="text-xs font-bold">${tituloMoroso}</p>
       <p class="text-xs mt-1">${escapeHtml(m.mensaje)}</p>
+      ${m.accion === "bloqueado" ? `<p class="text-xs mt-1 font-bold">Indícale al residente que debe resolver su adeudo con la Administración — no se le puede dejar pasar por esta vez.</p>` : ""}
       ${m.tieneConvenio && m.tieneConvenio.toLowerCase() === "si" ? `<p class="text-xs mt-1"><b>Tiene convenio de pago:</b> ${escapeHtml(m.detalleConvenio || "Sin detalle registrado")}</p>` : ""}
     </div>
     <div class="border border-slate-200 rounded-xl p-3 mt-2">
       <p class="text-xs text-slate-700"><b>Depto ${escapeHtml(depto)}</b>${data.recamaras ? " · " + data.recamaras + " recámara(s)" : " · recámaras no registradas"}</p>
+      ${data.nombreResidente ? `<p class="text-[11px] text-slate-500 mt-0.5">Titular registrado: <b>${escapeHtml(data.nombreResidente)}</b> — cotéjalo contra la identificación.</p>` : ""}
       ${!data.deptoEncontrado ? `<p class="text-[11px] text-amber-600 mt-1">Este depto no está en el padrón — verifica manualmente los datos.</p>` : ""}
     </div>
   `;
 
   // ---------- Residentes del depto vs huellas registradas ----------
-  // Independiente del límite de invitados: aquí se valida que quien registra
-  // + los residentes adicionales del MISMO depto no superen el número de
-  // huellas biométricas dadas de alta para esa unidad.
   const r = data.residentes;
   if (r) {
     let colorResidentes = "border-slate-200";
@@ -573,7 +640,7 @@ async function ejecutarConsultaDepto() {
       residentesTxt = `<p class="text-xs font-bold text-emerald-700 mt-1">✅ ${r.totalResidentesVisita} de ${r.huellasRegistradas} huella(s) registradas — puede pasar.</p>`;
     } else {
       colorResidentes = "border-red-200 bg-red-50";
-      residentesTxt = `<p class="text-xs font-bold text-red-700 mt-1">🚫 ${r.totalResidentesVisita} residentes declarados, pero el depto solo tiene ${r.huellasRegistradas} huella(s) registrada(s). No coincide — verifica identidad antes de dejar pasar a todos.</p>`;
+      residentesTxt = `<p class="text-xs font-bold text-red-700 mt-1">🚫 Supera las huellas disponibles: ${r.totalResidentesVisita} residentes declarados, pero el depto solo tiene ${r.huellasRegistradas} huella(s) registrada(s). No coincide — verifica identidad antes de dejar pasar a todos.</p>`;
     }
     html += `
       <div class="border ${colorResidentes} rounded-xl p-3 mt-2">
@@ -585,22 +652,54 @@ async function ejecutarConsultaDepto() {
 
   if (data.amenidad) {
     const am = data.amenidad;
+    const noAceptaInvitados = am.limiteInvitados === 0; // amenidad configurada con límite 0 (ej. Gimnasio)
     let permitidoTxt = "";
-    if (am.limiteInvitados === null) {
+    if (noAceptaInvitados) {
+      // Antes decía "Máximo 0 invitado(s)", que se lee raro — esta amenidad
+      // directamente no admite invitados, sin importar cuántos se declaren.
+      permitidoTxt = (am.invitadosSolicitados && am.invitadosSolicitados > 0)
+        ? `<p class="text-xs mt-1 font-bold text-red-700">🚫 Esta amenidad no acepta invitados — solo residentes del depto.</p>`
+        : `<p class="text-xs text-slate-600 mt-1">Esta amenidad no acepta invitados.</p>`;
+    } else if (am.invitadosSolicitados === null || am.invitadosSolicitados === 0) {
+      // Bug corregido: con 0 invitados no hay nada que "permitir" — no se
+      // muestra un check de "sí puede pasar con sus 0 invitados".
+      permitidoTxt = am.limiteInvitados === null
+        ? `<p class="text-xs text-slate-600 mt-1">No trae invitados.</p>`
+        : `<p class="text-xs text-slate-600 mt-1">No trae invitados. (Máximo ${am.limiteInvitados} invitado(s) para este depto si trajera).</p>`;
+    } else if (am.limiteInvitados === null) {
       permitidoTxt = `<p class="text-xs text-slate-600 mt-1">Sin límite de invitados registrado por recámara para esta amenidad — revisa las restricciones abajo.</p>`;
     } else {
       const ok = am.permitido;
       permitidoTxt = `<p class="text-xs mt-1 font-bold ${ok ? "text-emerald-700" : "text-red-700"}">
-        ${am.invitadosSolicitados !== null ? (ok ? "✅ Puede pasar con sus " + am.invitadosSolicitados + " invitado(s)" : "🚫 Excede el límite de invitados") : "Máximo " + am.limiteInvitados + " invitado(s) para este depto"}
+        ${ok ? "✅ Puede pasar con sus " + am.invitadosSolicitados + " invitado(s)" : "🚫 Excede el límite de invitados (máximo " + am.limiteInvitados + ")"}
       </p>`;
     }
+
+    // El botón de registrar ingreso se bloquea (gris, no clicable) si el
+    // depto está moroso-bloqueado, si los residentes exceden las huellas
+    // registradas, o si los invitados exceden el límite de la amenidad —
+    // en cualquiera de esos casos no debe poder registrarse el ingreso.
+    const bloqueadoPorMoroso = m.accion === "bloqueado";
+    const bloqueadoPorResidentes = r && r.permitido === false;
+    const bloqueadoPorInvitados = am.permitido === false;
+    const bloqueado = bloqueadoPorMoroso || bloqueadoPorResidentes || bloqueadoPorInvitados;
+
+    let motivoBloqueo = "";
+    if (bloqueadoPorMoroso) motivoBloqueo = "El depto está moroso y bloqueado.";
+    else if (bloqueadoPorResidentes) motivoBloqueo = "Los residentes superan las huellas registradas.";
+    else if (bloqueadoPorInvitados) motivoBloqueo = "Los invitados exceden el límite permitido.";
+
     html += `
       <div class="border border-slate-200 rounded-xl p-3 mt-2">
         <p class="text-xs font-bold text-slate-800">${escapeHtml(am.nombre)}</p>
         <p class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(am.horario)} · ${escapeHtml(am.dias)}</p>
         ${permitidoTxt}
         <p class="text-[11px] text-slate-500 mt-1 whitespace-pre-line">${escapeHtml(am.restricciones)}</p>
-        <button onclick="registrarIngresoAmenidad()" class="w-full mt-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg py-2 text-xs font-bold transition">✅ Registrar ingreso a esta amenidad</button>
+        ${bloqueado
+          ? `<p class="text-[11px] text-red-600 font-bold mt-2">🚫 No se puede registrar el ingreso: ${escapeHtml(motivoBloqueo)}</p>
+             <button disabled class="w-full mt-1 bg-slate-300 text-slate-500 rounded-lg py-2 text-xs font-bold cursor-not-allowed">Registrar ingreso a esta amenidad</button>`
+          : `<button id="btnRegistrarIngreso" onclick="registrarIngresoAmenidad()" class="w-full mt-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg py-2 text-xs font-bold transition">✅ Registrar ingreso a esta amenidad</button>`
+        }
       </div>
     `;
   }
@@ -610,19 +709,117 @@ async function ejecutarConsultaDepto() {
 
 async function registrarIngresoAmenidad() {
   if (!ultimaConsultaDepto || !ultimaConsultaDepto.data.amenidad) return;
-  const { depto, numResidentes, numInvitados, notas, data } = ultimaConsultaDepto;
-  await llamarBackend({
+  const boton = document.getElementById("btnRegistrarIngreso");
+  // Bloqueo de un solo clic: en cuanto se presiona, se deshabilita y se pone
+  // gris — así no se puede volver a registrar el mismo ingreso por accidente
+  // con un doble clic.
+  if (boton) {
+    boton.disabled = true;
+    boton.textContent = "Registrado ✓";
+    boton.className = "w-full mt-2 bg-slate-300 text-slate-500 rounded-lg py-2 text-xs font-bold cursor-not-allowed";
+  }
+
+  const { depto, nombreQuienRegistra, numResidentes, numInvitados, notas, data } = ultimaConsultaDepto;
+  const resp = await llamarBackend({
     accion: "registrar_reservacion",
     depto: depto,
     amenidad: data.amenidad.nombre,
+    nombreQuienRegistra: nombreQuienRegistra || "",
     numResidentes: numResidentes || "0",
     numInvitados: numInvitados || "0",
     notas: notas || "",
     guardiaNombre: guardNombre,
     guardiaPuesto: guardPuesto
   });
+
+  if (resp && resp.columnasFaltantes && resp.columnasFaltantes.length) {
+    document.getElementById("resultadoConsultaDepto").insertAdjacentHTML("beforeend",
+      `<p class="text-amber-600 text-[11px] mt-2">⚠️ Faltan columnas en Bitacora_Reservaciones, no se guardaron: ${escapeHtml(resp.columnasFaltantes.join(", "))}.</p>`);
+  }
   document.getElementById("resultadoConsultaDepto").insertAdjacentHTML("beforeend",
     `<p class="text-emerald-700 text-xs font-bold mt-2">✅ Ingreso registrado en la bitácora.</p>`);
+  alert("✅ Registro guardado correctamente.");
+}
+
+// =========================================================================
+// REGISTRAR SALIDA — marca FechaSalida en Bitacora_Reservaciones
+// =========================================================================
+function abrirModalRegistrarSalida() {
+  document.getElementById("modalRegistrarSalida").classList.remove("hidden");
+  cargarRegistrosActivos();
+}
+function cerrarModalRegistrarSalida() { document.getElementById("modalRegistrarSalida").classList.add("hidden"); }
+
+async function cargarRegistrosActivos() {
+  const cont = document.getElementById("listaRegistrosActivos");
+  cont.innerHTML = `<p class="text-slate-500 text-xs">Cargando registros activos…</p>`;
+  const data = await llamarBackend({ accion: "listar_registros_activos" });
+  if (!data || !data.ok) {
+    cont.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml((data && data.error) || "No se pudieron cargar los registros.")}</p>`;
+    return;
+  }
+  if (!data.registros.length) {
+    cont.innerHTML = `<p class="text-slate-500 text-xs">No hay registros activos ahorita — todos tienen salida marcada.</p>`;
+    return;
+  }
+  cont.innerHTML = data.registros.map(r => `
+    <div class="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
+      <div class="min-w-0">
+        <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(r.depto)} · ${escapeHtml(r.amenidad)}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">
+          ${r.nombreQuienRegistra ? escapeHtml(r.nombreQuienRegistra) + " · " : ""}Entrada: ${escapeHtml(r.timestampTexto)}
+        </p>
+      </div>
+      <button onclick="registrarSalidaClick('${r.registroId}')" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
+    </div>
+  `).join("");
+}
+
+async function registrarSalidaClick(registroId) {
+  const data = await llamarBackend({ accion: "registrar_salida", registroId: registroId });
+  if (!data || !data.ok) {
+    alert("No se pudo registrar la salida: " + ((data && data.error) || "error desconocido"));
+    return;
+  }
+  cargarRegistrosActivos(); // refresca la lista quitando el que ya salió
+}
+
+// =========================================================================
+// VERIFICAR PAQUETERÍA — solo morosidad, para Lobby/Recepción
+// =========================================================================
+function abrirModalVerificarPaqueteria() {
+  document.getElementById("fPaqueteriaDepto").value = "";
+  document.getElementById("resultadoVerificarPaqueteria").innerHTML = "";
+  document.getElementById("modalVerificarPaqueteria").classList.remove("hidden");
+  setTimeout(() => document.getElementById("fPaqueteriaDepto").focus(), 100);
+}
+function cerrarModalVerificarPaqueteria() { document.getElementById("modalVerificarPaqueteria").classList.add("hidden"); }
+
+async function ejecutarVerificarPaqueteria() {
+  const depto = document.getElementById("fPaqueteriaDepto").value.trim();
+  const resultado = document.getElementById("resultadoVerificarPaqueteria");
+  if (!depto) { resultado.innerHTML = `<p class="text-red-600 text-xs">Escribe el número de depto.</p>`; return; }
+  resultado.innerHTML = `<p class="text-slate-500 text-xs">Consultando…</p>`;
+
+  const data = await llamarBackend({
+    accion: "verificar_moroso_simple",
+    depto: depto,
+    guardiaNombre: guardNombre,
+    guardiaPuesto: guardPuesto
+  });
+  if (!data || !data.ok) {
+    resultado.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml((data && data.error) || "Error al consultar.")}</p>`;
+    return;
+  }
+  const color = data.esMoroso ? "bg-red-50 border-red-300 text-red-800" : "bg-emerald-50 border-emerald-200 text-emerald-800";
+  const titulo = data.esMoroso ? "🚫 MOROSO — no entregar paquetería sin autorización" : "✅ Al corriente";
+  resultado.innerHTML = `
+    <div class="border rounded-xl p-3 mt-1 ${color}">
+      <p class="text-xs font-bold">${titulo}</p>
+      <p class="text-xs mt-1">Depto ${escapeHtml(depto)}${!data.deptoEncontrado ? " (no está en el padrón de morosos — se asume al corriente)" : ""}</p>
+      ${data.tieneConvenio && data.tieneConvenio.toLowerCase() === "si" ? `<p class="text-xs mt-1"><b>Tiene convenio de pago:</b> ${escapeHtml(data.detalleConvenio || "Sin detalle registrado")}</p>` : ""}
+    </div>
+  `;
 }
 
 // =========================================================================
@@ -1062,9 +1259,11 @@ function pintarPanelIncidentes(incidentes) {
 
 // ---------- Inicio ----------
 cargarDatos();
-actualizarBadgeGuardia();
-if (!guardNombre) {
-  abrirModalIdentidad();
-} else {
-  pintarMensaje("Hola " + guardNombre.split(" ")[0] + ", soy el Agente de Reglamento y Amenidades de UPLACE Torre 1. Pregúntame qué se puede o no se puede, consulta un horario, o usa \"Consultar depto\" para verificar morosidad e invitados.", "bot");
-}
+cargarGuardias().finally(() => {
+  actualizarBadgeGuardia();
+  if (!guardNombre) {
+    abrirModalIdentidad();
+  } else {
+    pintarMensaje("Hola " + guardNombre.split(" ")[0] + ", soy el Agente de Reglamento y Amenidades de UPLACE Torre 1. Pregúntame qué se puede o no se puede, consulta un horario, o usa \"Consultar / Registrar Depto\" para verificar morosidad e invitados.", "bot");
+  }
+});
