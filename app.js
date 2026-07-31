@@ -501,7 +501,9 @@ function poblarSelectAmenidades() {
 
 function abrirModalConsultarDepto() {
   document.getElementById("fConsultaDepto").value = "";
+  document.getElementById("fConsultaResidentes").value = "";
   document.getElementById("fConsultaInvitados").value = "";
+  document.getElementById("fConsultaNotas").value = "";
   document.getElementById("resultadoConsultaDepto").innerHTML = "";
   document.getElementById("modalConsultarDepto").classList.remove("hidden");
   setTimeout(() => document.getElementById("fConsultaDepto").focus(), 100);
@@ -513,7 +515,9 @@ let ultimaConsultaDepto = null; // guarda el resultado para poder "registrar ing
 async function ejecutarConsultaDepto() {
   const depto = document.getElementById("fConsultaDepto").value.trim();
   const amenidadId = document.getElementById("fConsultaAmenidad").value;
+  const numResidentes = document.getElementById("fConsultaResidentes").value.trim();
   const numInvitados = document.getElementById("fConsultaInvitados").value.trim();
+  const notas = document.getElementById("fConsultaNotas").value.trim();
   const resultado = document.getElementById("resultadoConsultaDepto");
 
   if (!depto) { resultado.innerHTML = `<p class="text-red-600 text-xs">Escribe el número de depto.</p>`; return; }
@@ -523,6 +527,7 @@ async function ejecutarConsultaDepto() {
     accion: "verificar_acceso",
     depto: depto,
     amenidadId: amenidadId,
+    numResidentes: numResidentes,
     numInvitados: numInvitados,
     guardiaNombre: guardNombre,
     guardiaPuesto: guardPuesto
@@ -532,7 +537,7 @@ async function ejecutarConsultaDepto() {
     resultado.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml(data.error || "Error al consultar.")}</p>`;
     return;
   }
-  ultimaConsultaDepto = { depto, amenidadId, numInvitados, data };
+  ultimaConsultaDepto = { depto, amenidadId, numResidentes, numInvitados, notas, data };
 
   const m = data.moroso;
   let colorMoroso = "bg-emerald-50 border-emerald-200 text-emerald-800";
@@ -552,6 +557,31 @@ async function ejecutarConsultaDepto() {
       ${!data.deptoEncontrado ? `<p class="text-[11px] text-amber-600 mt-1">Este depto no está en el padrón — verifica manualmente los datos.</p>` : ""}
     </div>
   `;
+
+  // ---------- Residentes del depto vs huellas registradas ----------
+  // Independiente del límite de invitados: aquí se valida que quien registra
+  // + los residentes adicionales del MISMO depto no superen el número de
+  // huellas biométricas dadas de alta para esa unidad.
+  const r = data.residentes;
+  if (r) {
+    let colorResidentes = "border-slate-200";
+    let residentesTxt;
+    if (r.huellasRegistradas === null) {
+      residentesTxt = `<p class="text-xs text-slate-600 mt-1">Total: <b>${r.totalResidentesVisita}</b> residente(s) del depto (quien registra${r.numResidentesAdicionales ? " + " + r.numResidentesAdicionales + " más" : ""}). Sin huellas registradas para este depto — verifica manualmente.</p>`;
+    } else if (r.permitido) {
+      colorResidentes = "border-emerald-200 bg-emerald-50";
+      residentesTxt = `<p class="text-xs font-bold text-emerald-700 mt-1">✅ ${r.totalResidentesVisita} de ${r.huellasRegistradas} huella(s) registradas — puede pasar.</p>`;
+    } else {
+      colorResidentes = "border-red-200 bg-red-50";
+      residentesTxt = `<p class="text-xs font-bold text-red-700 mt-1">🚫 ${r.totalResidentesVisita} residentes declarados, pero el depto solo tiene ${r.huellasRegistradas} huella(s) registrada(s). No coincide — verifica identidad antes de dejar pasar a todos.</p>`;
+    }
+    html += `
+      <div class="border ${colorResidentes} rounded-xl p-3 mt-2">
+        <p class="text-xs font-bold text-slate-800">👥 Residentes del depto que se presentan</p>
+        ${residentesTxt}
+      </div>
+    `;
+  }
 
   if (data.amenidad) {
     const am = data.amenidad;
@@ -580,12 +610,14 @@ async function ejecutarConsultaDepto() {
 
 async function registrarIngresoAmenidad() {
   if (!ultimaConsultaDepto || !ultimaConsultaDepto.data.amenidad) return;
-  const { depto, numInvitados, data } = ultimaConsultaDepto;
+  const { depto, numResidentes, numInvitados, notas, data } = ultimaConsultaDepto;
   await llamarBackend({
     accion: "registrar_reservacion",
     depto: depto,
     amenidad: data.amenidad.nombre,
+    numResidentes: numResidentes || "0",
     numInvitados: numInvitados || "0",
+    notas: notas || "",
     guardiaNombre: guardNombre,
     guardiaPuesto: guardPuesto
   });

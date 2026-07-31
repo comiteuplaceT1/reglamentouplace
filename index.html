@@ -203,8 +203,17 @@
       <label class="block text-[11px] font-bold text-slate-500 mb-1">¿A qué amenidad viene? (opcional)</label>
       <select id="fConsultaAmenidad" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"></select>
 
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Residentes adicionales del mismo depto (opcional)</label>
+      <input id="fConsultaResidentes" type="number" min="0" placeholder="0"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+      <p class="text-[10px] text-slate-400 mb-3">No cuentes a quien está registrando — solo pareja, hijos u otro residente del mismo depto que lo acompañe. Si viene solo, deja en 0.</p>
+
       <label class="block text-[11px] font-bold text-slate-500 mb-1">Número de invitados (opcional)</label>
       <input id="fConsultaInvitados" type="number" min="0" placeholder="0"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+
+      <label class="block text-[11px] font-bold text-slate-500 mb-1">Notas (opcional)</label>
+      <input id="fConsultaNotas" type="text" placeholder="ej. viene con silla de ruedas, evento familiar, etc."
         class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
 
       <button onclick="ejecutarConsultaDepto()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-3 text-sm font-bold transition mb-3">Verificar</button>
@@ -279,7 +288,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260731d"></script>
+<script src="app.js?v=20260731f"></script>
 
 </body>
 </html>
