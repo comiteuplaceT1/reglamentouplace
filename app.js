@@ -4,8 +4,6 @@
 // parser CSV RFC4180 char-by-char.
 // =========================================================================
 
-https://script.google.com/macros/s/AKfycbw_QUTTZ9mTdBvLujC5EWL3bHU_XGd73dnFMVsemxBQmq1oX5lW_ytBTfVzXNMhpmCg5A/exec
-
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
