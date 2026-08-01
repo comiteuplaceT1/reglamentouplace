@@ -7,12 +7,12 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzWJtq1jtNtPm-8z3G4ZgV727MJWaHCvQLSXKGlDeHM7JK5tYw6UOyFaBuUmYSL0SUD/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbyNKz99tY-rZIm3Kimi6s8kcqY2lzk29Vt1tHaRcfhoiUCD2bvaifuRukeRxSBeeO0RKA/exec"
 };
 
 let reglamentoData = [];
 let amenidadesData = [];
-let guardiasData = []; // se llena desde el Sheet (tab "Guardias") para el selector del modal de identidad
+let guardiasData = []; // se llena desde el Sheet (tab "Personal_Seguridad") para el selector del modal de identidad
 let adminPin = null;
 
 // Identidad del guardia en esta sesión de navegador (persiste entre recargas
@@ -103,8 +103,10 @@ async function cargarDatos() {
 
 // Lista de guardias para el selector del modal de identidad (en vez de texto
 // libre, para evitar variantes del mismo nombre en la bitácora). Si la hoja
-// "Guardias" está vacía o no existe todavía, el select solo muestra la
-// opción "Otro" y cae en el input manual — no bloquea el inicio de sesión.
+// "Personal_Seguridad" está vacía o no existe todavía, el select solo
+// muestra la opción "Otro" y cae en el input manual — no bloquea el inicio
+// de sesión. El Puesto NO viene de esta hoja (se queda en su propio select
+// con lista fija, tal como estaba).
 async function cargarGuardias() {
   try {
     const data = await llamarBackend({ accion: "listar_guardias" });
@@ -122,11 +124,11 @@ async function cargarGuardias() {
       const opt = document.createElement("option");
       opt.value = g.nombre;
       opt.dataset.guardia = "1";
-      opt.dataset.puesto = g.puesto || "";
-      opt.textContent = g.nombre + (g.puesto ? " — " + g.puesto : "");
+      opt.textContent = g.nombre;
       select.insertBefore(opt, select.querySelector('option[value="__otro__"]'));
     });
 }
+
 
 // Mapeo de Categoria (tal cual está en el Sheet) -> Grupo amplio para el
 // submenú del sidebar. Si mañana el Comité agrega una Categoria nueva que no
@@ -407,11 +409,10 @@ function abrirModalIdentidad() {
   document.getElementById("fIdentidadPuesto").value = guardPuesto || "Guardia de Turno";
   document.getElementById("modalIdentidad").classList.remove("hidden");
 }
-// Al elegir un nombre de la lista, autocompleta su puesto registrado (el
-// guardia lo puede cambiar si ese día cubre otra función); al elegir "Otro"
-// se revela el campo de texto libre.
+// Al elegir "Otro" (no está en el catálogo Personal_Seguridad) se revela el
+// campo de texto libre. El Puesto ya NO se autocompleta desde el Sheet — se
+// sigue eligiendo a mano en su propio select, como estaba antes.
 document.getElementById("fIdentidadNombreSelect").addEventListener("change", (e) => {
-  const opt = e.target.selectedOptions[0];
   const manual = document.getElementById("fIdentidadNombreManual");
   if (e.target.value === "__otro__") {
     manual.classList.remove("hidden");
@@ -420,7 +421,6 @@ document.getElementById("fIdentidadNombreSelect").addEventListener("change", (e)
   } else {
     manual.classList.add("hidden");
     manual.value = "";
-    if (opt && opt.dataset.puesto) document.getElementById("fIdentidadPuesto").value = opt.dataset.puesto;
   }
 });
 function cerrarModalIdentidad() {
@@ -580,7 +580,7 @@ let ultimaConsultaDepto = null; // guarda el resultado para poder "registrar ing
 async function ejecutarConsultaDepto() {
   const depto = document.getElementById("fConsultaDepto").value.trim();
   const amenidadId = document.getElementById("fConsultaAmenidad").value;
-  const nombreQuienRegistra = document.getElementById("fConsultaNombreResidente").value.trim();
+  const nombreResidentePresenta = document.getElementById("fConsultaNombreResidente").value.trim();
   const numResidentes = document.getElementById("fConsultaResidentes").value.trim();
   const numInvitados = document.getElementById("fConsultaInvitados").value.trim();
   const notas = document.getElementById("fConsultaNotas").value.trim();
@@ -603,7 +603,7 @@ async function ejecutarConsultaDepto() {
     resultado.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml(data.error || "Error al consultar.")}</p>`;
     return;
   }
-  ultimaConsultaDepto = { depto, amenidadId, nombreQuienRegistra, numResidentes, numInvitados, notas, data };
+  ultimaConsultaDepto = { depto, amenidadId, nombreResidentePresenta, numResidentes, numInvitados, notas, data };
 
   const m = data.moroso;
   // Política sin tolerancia: un moroso se bloquea SIEMPRE (ya no existe el
@@ -718,12 +718,12 @@ async function registrarIngresoAmenidad() {
     boton.className = "w-full mt-2 bg-slate-300 text-slate-500 rounded-lg py-2 text-xs font-bold cursor-not-allowed";
   }
 
-  const { depto, nombreQuienRegistra, numResidentes, numInvitados, notas, data } = ultimaConsultaDepto;
+  const { depto, nombreResidentePresenta, numResidentes, numInvitados, notas, data } = ultimaConsultaDepto;
   const resp = await llamarBackend({
     accion: "registrar_reservacion",
     depto: depto,
     amenidad: data.amenidad.nombre,
-    nombreQuienRegistra: nombreQuienRegistra || "",
+    nombreResidentePresenta: nombreResidentePresenta || "",
     numResidentes: numResidentes || "0",
     numInvitados: numInvitados || "0",
     notas: notas || "",
@@ -766,7 +766,7 @@ async function cargarRegistrosActivos() {
       <div class="min-w-0">
         <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(r.depto)} · ${escapeHtml(r.amenidad)}</p>
         <p class="text-[11px] text-slate-500 mt-0.5">
-          ${r.nombreQuienRegistra ? escapeHtml(r.nombreQuienRegistra) + " · " : ""}Entrada: ${escapeHtml(r.timestampTexto)}
+          ${r.nombreResidentePresenta ? escapeHtml(r.nombreResidentePresenta) + " · " : ""}Entrada: ${escapeHtml(r.timestampTexto)}
         </p>
       </div>
       <button onclick="registrarSalidaClick('${r.registroId}')" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
