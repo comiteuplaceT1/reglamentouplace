@@ -4,10 +4,12 @@
 // parser CSV RFC4180 char-by-char.
 // =========================================================================
 
+https://script.google.com/macros/s/AKfycbw_QUTTZ9mTdBvLujC5EWL3bHU_XGd73dnFMVsemxBQmq1oX5lW_ytBTfVzXNMhpmCg5A/exec
+
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbyhkDPPf5Ep_2Xz6TsQB3dSmfMXy4anxzngBrhklLNgYK3_CQ2Dc_ighPXyx4_mt8TPjA/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbw_QUTTZ9mTdBvLujC5EWL3bHU_XGd73dnFMVsemxBQmq1oX5lW_ytBTfVzXNMhpmCg5A/exec"
 };
 
 let reglamentoData = [];
@@ -71,6 +73,17 @@ async function llamarBackend(params) {
   const url = CONFIG.WEBAPP_URL + "?" + new URLSearchParams(params).toString();
   const res = await fetch(url);
   return res.json();
+}
+
+// El backend regresa errores de dos formas: { ok:false, error:"texto" } en
+// las funciones normales, o { error:true, detalle:"texto" } cuando algo
+// truena y lo atrapa el try/catch general de doGet (ej. falta un permiso).
+// Sin esto, ese segundo caso mostraba literalmente "true" en pantalla.
+function mensajeError(data, fallback) {
+  if (!data) return fallback;
+  if (typeof data.error === "string" && data.error) return data.error;
+  if (data.detalle) return data.detalle;
+  return fallback;
 }
 
 // Para acciones con carga pesada (foto de evidencia de incidentes) — POST.
@@ -833,7 +846,7 @@ async function cargarRegistrosActivos() {
   cont.innerHTML = `<p class="text-slate-500 text-xs">Cargando ocupación activa…</p>`;
   const data = await llamarBackend({ accion: "listar_registros_activos" });
   if (!data || !data.ok) {
-    cont.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml((data && data.error) || "No se pudieron cargar los registros.")}</p>`;
+    cont.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml(mensajeError(data, "No se pudieron cargar los registros."))}</p>`;
     return;
   }
   if (!data.grupos.length) {
@@ -920,7 +933,7 @@ async function registrarSalidaClick(depto, amenidad, i) {
     numInvitadosSalen: numInvitadosSalen
   });
   if (!data || !data.ok) {
-    alert("No se pudo registrar la salida: " + ((data && data.error) || "error desconocido"));
+    alert("No se pudo registrar la salida: " + (mensajeError(data, "error desconocido")));
     return;
   }
   if (data.advertencia) alert("⚠️ " + data.advertencia);
@@ -954,7 +967,7 @@ async function ejecutarVerificarPaqueteria() {
     guardiaPuesto: guardPuesto
   });
   if (!data || !data.ok) {
-    resultado.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml((data && data.error) || "Error al consultar.")}</p>`;
+    resultado.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml(mensajeError(data, "Error al consultar."))}</p>`;
     return;
   }
   const color = data.esMoroso ? "bg-red-50 border-red-300 text-red-800" : "bg-emerald-50 border-emerald-200 text-emerald-800";
@@ -1137,7 +1150,7 @@ async function ejecutarInstalarTriggerArchivo() {
   resultado.innerHTML = `<p class="text-slate-500 text-xs">Activando…</p>`;
   const data = await llamarBackend({ accion: "instalar_trigger_mensual", pin: adminPin });
   if (!data || !data.ok) {
-    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo activar.")}</p>`;
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml(mensajeError(data, "No se pudo activar."))}</p>`;
     return;
   }
   alert("✅ Automatización activada — correrá sola cada día 1 del mes a la 1am.");
@@ -1150,7 +1163,7 @@ async function ejecutarDesactivarTriggerArchivo() {
   resultado.innerHTML = `<p class="text-slate-500 text-xs">Desactivando…</p>`;
   const data = await llamarBackend({ accion: "desactivar_trigger_mensual", pin: adminPin });
   if (!data || !data.ok) {
-    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo desactivar.")}</p>`;
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml(mensajeError(data, "No se pudo desactivar."))}</p>`;
     return;
   }
   alert("✅ Automatización desactivada. Lo ya archivado en meses anteriores no se toca.");
@@ -1163,7 +1176,7 @@ async function ejecutarArchivarAhora() {
   resultado.innerHTML = `<p class="text-slate-500 text-xs">Archivando…</p>`;
   const data = await llamarBackend({ accion: "archivar_mensual_ahora", pin: adminPin });
   if (!data || !data.ok) {
-    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo archivar.")}</p>`;
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml(mensajeError(data, "No se pudo archivar."))}</p>`;
     return;
   }
   const bit = data.resultado.bitacora || {};
@@ -1187,7 +1200,7 @@ async function ejecutarCierreAdmin() {
   resultado.innerHTML = `<p class="text-slate-500 text-xs">Cerrando…</p>`;
   const data = await llamarBackend({ accion: "cerrar_todos_registros", pin: adminPin });
   if (!data || !data.ok) {
-    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo ejecutar.")}</p>`;
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml(mensajeError(data, "No se pudo ejecutar."))}</p>`;
     return;
   }
   resultado.innerHTML = `<p class="text-emerald-700 text-xs font-bold">✅ Se cerraron ${data.renglonesCerrados} registro(s), ${data.personasCerradas} persona(s) en total.</p>
