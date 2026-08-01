@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbxwmrOJ4K4APgOJJnRwu4GUvAQvomS1a60gx7nt2RjtBcPOprXSDYZm0rWPEAlQt9V9gQ/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbyhkDPPf5Ep_2Xz6TsQB3dSmfMXy4anxzngBrhklLNgYK3_CQ2Dc_ighPXyx4_mt8TPjA/exec"
 };
 
 let reglamentoData = [];
@@ -1076,19 +1076,25 @@ const TABS_ADMIN = [
 
 async function cargarPanelAdmin() {
   document.getElementById("adminBody").innerHTML = `<p class="text-sm text-slate-500">Cargando…</p>`;
-  const [regData, ameData, morData, incData] = await Promise.all([
+  const [regData, ameData, morData, incData, estadoTrigger] = await Promise.all([
     llamarBackend({ accion: "listar_reglamento", pin: adminPin }),
     llamarBackend({ accion: "listar_amenidades", pin: adminPin }),
     llamarBackend({ accion: "listar_morosos", pin: adminPin }),
-    llamarBackend({ accion: "listar_incidentes", pin: adminPin })
+    llamarBackend({ accion: "listar_incidentes", pin: adminPin }),
+    llamarBackend({ accion: "estado_trigger_mensual", pin: adminPin })
   ]);
 
   const body = document.getElementById("adminBody");
   body.innerHTML = `
     <div class="border border-sky-200 bg-sky-50 rounded-xl p-3 mb-3">
       <p class="text-xs font-bold text-sky-800">📦 Archivado mensual</p>
-      <p class="text-[11px] text-sky-700 mt-1">Bitacora_Reservaciones y Consultas_Seguridad se vacían solas cada día 1 del mes; lo del mes anterior se mueve a pestañas nuevas ("Bitacora Julio 2026", etc.) en este mismo Sheet. Instálalo una sola vez.</p>
-      <button onclick="ejecutarInstalarTriggerArchivo()" class="w-full mt-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg py-2 text-xs font-bold transition">Activar automatización mensual (una sola vez)</button>
+      <p class="text-[11px] text-sky-700 mt-1">Bitacora_Reservaciones y Consultas_Seguridad se vacían solas cada día 1 del mes; lo del mes anterior se mueve a pestañas nuevas ("Bitacora Julio 2026", etc.) en este mismo Sheet.</p>
+      <div class="mt-2 rounded-lg px-3 py-2 text-xs font-bold ${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}">
+        ${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado
+          ? "✅ Automatización ACTIVA — corre sola cada día 1 a la 1am. Puedes desactivarla abajo si lo necesitas."
+          : "⚠️ Todavía NO está activada — actívala una vez con el botón de abajo."}
+      </div>
+      <button onclick="${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "ejecutarDesactivarTriggerArchivo()" : "ejecutarInstalarTriggerArchivo()"}" class="w-full mt-2 ${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "bg-red-600 hover:bg-red-700" : "bg-sky-600 hover:bg-sky-700"} text-white rounded-lg py-2 text-xs font-bold transition">${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "Desactivar automatización mensual" : "Activar automatización mensual (una sola vez)"}</button>
       <button onclick="ejecutarArchivarAhora()" class="w-full mt-1.5 bg-white border border-sky-300 hover:bg-sky-100 text-sky-700 rounded-lg py-2 text-xs font-bold transition">Archivar meses anteriores ahora (manual)</button>
       <div id="resultadoArchivado" class="mt-2"></div>
     </div>
@@ -1134,7 +1140,21 @@ async function ejecutarInstalarTriggerArchivo() {
     resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo activar.")}</p>`;
     return;
   }
-  resultado.innerHTML = `<p class="text-emerald-700 text-xs font-bold">✅ Automatización activada — correrá sola cada día 1 del mes a la 1am.</p>`;
+  alert("✅ Automatización activada — correrá sola cada día 1 del mes a la 1am.");
+  cargarPanelAdmin(); // refresca todo el panel para que el badge de arriba pase a "ACTIVA" de una vez
+}
+
+async function ejecutarDesactivarTriggerArchivo() {
+  if (!confirm("¿Desactivar la automatización mensual? Bitacora_Reservaciones y Consultas_Seguridad dejarán de vaciarse solas cada día 1 — tendrías que archivar a mano con el botón manual, o volver a activarla después.")) return;
+  const resultado = document.getElementById("resultadoArchivado");
+  resultado.innerHTML = `<p class="text-slate-500 text-xs">Desactivando…</p>`;
+  const data = await llamarBackend({ accion: "desactivar_trigger_mensual", pin: adminPin });
+  if (!data || !data.ok) {
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo desactivar.")}</p>`;
+    return;
+  }
+  alert("✅ Automatización desactivada. Lo ya archivado en meses anteriores no se toca.");
+  cargarPanelAdmin(); // refresca el panel para que el badge de arriba pase a "NO activa"
 }
 
 async function ejecutarArchivarAhora() {
