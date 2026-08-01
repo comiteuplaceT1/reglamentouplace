@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbyNKz99tY-rZIm3Kimi6s8kcqY2lzk29Vt1tHaRcfhoiUCD2bvaifuRukeRxSBeeO0RKA/exec"
+  WEBAPP_URL: "hhttps://script.google.com/macros/s/AKfycbwHIr2zV95qfn12uV4qIwGmDLgXibDmuKt3ghgD043C-h_mTd1KdiXtcfBR4n09TWmJ-w/exec"
 };
 
 let reglamentoData = [];
@@ -627,7 +627,7 @@ async function ejecutarConsultaDepto() {
     </div>
   `;
 
-  // ---------- Residentes del depto vs huellas registradas ----------
+  // ---------- Residentes del depto vs huellas registradas (contra capacidad DISPONIBLE) ----------
   const r = data.residentes;
   if (r) {
     let colorResidentes = "border-slate-200";
@@ -636,10 +636,13 @@ async function ejecutarConsultaDepto() {
       residentesTxt = `<p class="text-xs text-slate-600 mt-1">Total: <b>${r.totalResidentesVisita}</b> residente(s) del depto (quien registra${r.numResidentesAdicionales ? " + " + r.numResidentesAdicionales + " más" : ""}). Sin huellas registradas para este depto — verifica manualmente.</p>`;
     } else if (r.permitido) {
       colorResidentes = "border-emerald-200 bg-emerald-50";
-      residentesTxt = `<p class="text-xs font-bold text-emerald-700 mt-1">✅ ${r.totalResidentesVisita} de ${r.huellasRegistradas} huella(s) registradas — puede pasar.</p>`;
+      residentesTxt = `<p class="text-xs font-bold text-emerald-700 mt-1">✅ Puede pasar: caben ${r.totalResidentesVisita} de ${r.disponibles} disponible(s) ahorita.</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Huellas registradas: ${r.huellasRegistradas}${r.activosAhora ? " · ya hay " + r.activosAhora + " residente(s) activo(s) en esta amenidad" : ""}.</p>`;
     } else {
       colorResidentes = "border-red-200 bg-red-50";
-      residentesTxt = `<p class="text-xs font-bold text-red-700 mt-1">🚫 Supera las huellas disponibles: ${r.totalResidentesVisita} residentes declarados, pero el depto solo tiene ${r.huellasRegistradas} huella(s) registrada(s). No coincide — verifica identidad antes de dejar pasar a todos.</p>`;
+      residentesTxt = r.activosAhora > 0
+        ? `<p class="text-xs font-bold text-red-700 mt-1">🚫 Ahorita solo caben ${r.disponibles} de los ${r.totalResidentesVisita} residentes declarados — ya hay ${r.activosAhora} activo(s) en esta amenidad (huellas registradas: ${r.huellasRegistradas}).</p>`
+        : `<p class="text-xs font-bold text-red-700 mt-1">🚫 Supera las huellas disponibles: ${r.totalResidentesVisita} residentes declarados, pero el depto solo tiene ${r.huellasRegistradas} huella(s) registrada(s).</p>`;
     }
     html += `
       <div class="border ${colorResidentes} rounded-xl p-3 mt-2">
@@ -669,9 +672,14 @@ async function ejecutarConsultaDepto() {
       permitidoTxt = `<p class="text-xs text-slate-600 mt-1">Sin límite de invitados registrado por recámara para esta amenidad — revisa las restricciones abajo.</p>`;
     } else {
       const ok = am.permitido;
-      permitidoTxt = `<p class="text-xs mt-1 font-bold ${ok ? "text-emerald-700" : "text-red-700"}">
-        ${ok ? "✅ Puede pasar con sus " + am.invitadosSolicitados + " invitado(s)" : "🚫 Excede el límite de invitados (máximo " + am.limiteInvitados + ")"}
-      </p>`;
+      if (ok) {
+        permitidoTxt = `<p class="text-xs mt-1 font-bold text-emerald-700">✅ Puede pasar con sus ${am.invitadosSolicitados} invitado(s).</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">Disponibles ahorita: ${am.invitadosDisponibles} de ${am.limiteInvitados}${am.invitadosActivosAhora ? " · ya hay " + am.invitadosActivosAhora + " invitado(s) activo(s) en esta amenidad" : ""}.</p>`;
+      } else {
+        permitidoTxt = am.invitadosActivosAhora > 0
+          ? `<p class="text-xs mt-1 font-bold text-red-700">🚫 Ahorita solo caben ${am.invitadosDisponibles} de los ${am.invitadosSolicitados} invitados declarados — ya hay ${am.invitadosActivosAhora} activo(s) (límite ${am.limiteInvitados}).</p>`
+          : `<p class="text-xs mt-1 font-bold text-red-700">🚫 Excede el límite de invitados (máximo ${am.limiteInvitados}).</p>`;
+      }
     }
 
     // El botón de registrar ingreso se bloquea (gris, no clicable) si el
@@ -741,7 +749,7 @@ async function registrarIngresoAmenidad() {
 }
 
 // =========================================================================
-// REGISTRAR SALIDA — marca FechaSalida en Bitacora_Reservaciones
+// REGISTRAR SALIDA — ocupación activa por depto+amenidad, salidas parciales
 // =========================================================================
 function abrirModalRegistrarSalida() {
   document.getElementById("modalRegistrarSalida").classList.remove("hidden");
@@ -751,37 +759,71 @@ function cerrarModalRegistrarSalida() { document.getElementById("modalRegistrarS
 
 async function cargarRegistrosActivos() {
   const cont = document.getElementById("listaRegistrosActivos");
-  cont.innerHTML = `<p class="text-slate-500 text-xs">Cargando registros activos…</p>`;
+  cont.innerHTML = `<p class="text-slate-500 text-xs">Cargando ocupación activa…</p>`;
   const data = await llamarBackend({ accion: "listar_registros_activos" });
   if (!data || !data.ok) {
     cont.innerHTML = `<p class="text-red-600 text-xs">${escapeHtml((data && data.error) || "No se pudieron cargar los registros.")}</p>`;
     return;
   }
-  if (!data.registros.length) {
-    cont.innerHTML = `<p class="text-slate-500 text-xs">No hay registros activos ahorita — todos tienen salida marcada.</p>`;
+  if (!data.grupos.length) {
+    cont.innerHTML = `<p class="text-slate-500 text-xs">No hay nadie activo ahorita — todos tienen salida registrada.</p>`;
     return;
   }
-  cont.innerHTML = data.registros.map(r => `
-    <div class="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
-      <div class="min-w-0">
-        <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(r.depto)} · ${escapeHtml(r.amenidad)}</p>
-        <p class="text-[11px] text-slate-500 mt-0.5">
-          ${r.nombreResidentePresenta ? escapeHtml(r.nombreResidentePresenta) + " · " : ""}Entrada: ${escapeHtml(r.timestampTexto)}
-        </p>
+  // Un card por depto+amenidad con ocupación activa (puede venir de varias
+  // llegadas distintas ya sumadas). El guardia declara cuántos residentes e
+  // invitados salen AHORA — no tiene que ser el total, puede ser salida parcial.
+  cont.innerHTML = data.grupos.map((g, i) => `
+    <div class="border border-slate-200 rounded-xl p-3">
+      <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(g.depto)} · ${escapeHtml(g.amenidad)}</p>
+      <p class="text-[11px] text-slate-500 mt-0.5">
+        Activos ahorita: <b>${g.activosResidentes} residente(s)</b>, <b>${g.activosInvitados} invitado(s)</b>
+        ${g.primeraLlegadaTexto ? " · adentro desde " + escapeHtml(g.primeraLlegadaTexto) : ""}
+      </p>
+      <div class="grid grid-cols-2 gap-2 mt-2">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Residentes que salen</label>
+          <input id="salidaRes-${i}" type="number" min="0" max="${g.activosResidentes}" value="${g.activosResidentes}"
+            class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Invitados que salen</label>
+          <input id="salidaInv-${i}" type="number" min="0" max="${g.activosInvitados}" value="${g.activosInvitados}"
+            class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+        </div>
       </div>
-      <button onclick="registrarSalidaClick('${r.registroId}')" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
+      <button onclick="registrarSalidaClick('${escapeHtml(g.depto)}', '${escapeHtml(g.amenidad)}', ${i})" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
     </div>
   `).join("");
 }
 
-async function registrarSalidaClick(registroId) {
-  const data = await llamarBackend({ accion: "registrar_salida", registroId: registroId });
+async function registrarSalidaClick(depto, amenidad, i) {
+  const numResidentesSalen = Math.max(0, Math.floor(Number(document.getElementById("salidaRes-" + i).value) || 0));
+  const numInvitadosSalen = Math.max(0, Math.floor(Number(document.getElementById("salidaInv-" + i).value) || 0));
+  if (numResidentesSalen === 0 && numInvitadosSalen === 0) {
+    alert("Indica cuántos residentes o invitados están saliendo.");
+    return;
+  }
+  const confirmado = confirm(
+    "Vas a registrar la salida de " + numResidentesSalen + " residente(s) y " + numInvitadosSalen +
+    " invitado(s) del depto " + depto + " en " + amenidad + ". ¿Confirmar?"
+  );
+  if (!confirmado) return;
+
+  const data = await llamarBackend({
+    accion: "registrar_salida",
+    depto: depto,
+    amenidad: amenidad,
+    numResidentesSalen: numResidentesSalen,
+    numInvitadosSalen: numInvitadosSalen
+  });
   if (!data || !data.ok) {
     alert("No se pudo registrar la salida: " + ((data && data.error) || "error desconocido"));
     return;
   }
-  alert("✅ Salida registrada correctamente" + (data.fechaSalida ? " (" + data.fechaSalida + ")" : "") + ".");
-  cargarRegistrosActivos(); // refresca la lista quitando el que ya salió
+  if (data.advertencia) alert("⚠️ " + data.advertencia);
+  alert("✅ Salida registrada correctamente (" + data.fechaSalida + "): " +
+    data.residentesRegistrados + " residente(s) y " + data.invitadosRegistrados + " invitado(s).");
+  cargarRegistrosActivos(); // refresca: si ya no queda nadie activo, el card desaparece solo
 }
 
 // =========================================================================
