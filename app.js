@@ -545,10 +545,14 @@ const overlay = document.getElementById("sidebarOverlay");
 document.getElementById("openSidebarBtn").addEventListener("click", () => {
   sidebar.classList.remove("-translate-x-full");
   overlay.classList.remove("hidden");
+  sidebarMobileAbierto = true;
+  aplicarVisibilidadFab(); // oculta el flotante mientras el menú está abierto (solo en móvil)
 });
 function cerrarSidebar() {
   sidebar.classList.add("-translate-x-full");
   overlay.classList.add("hidden");
+  sidebarMobileAbierto = false;
+  aplicarVisibilidadFab(); // vuelve a mostrar el flotante si sigue habiendo ocupación activa
 }
 document.getElementById("closeSidebarBtn").addEventListener("click", cerrarSidebar);
 overlay.addEventListener("click", cerrarSidebar);
@@ -753,23 +757,53 @@ async function registrarIngresoAmenidad() {
 // =========================================================================
 // BOTÓN FLOTANTE — siempre visible mientras haya alguien activo sin salida
 // =========================================================================
+let sidebarMobileAbierto = false; // lo actualiza el toggle del sidebar, más abajo
+
 async function actualizarFabSalida() {
-  const fab = document.getElementById("fabRegistrarSalida");
-  const badge = document.getElementById("fabBadge");
   try {
     const data = await llamarBackend({ accion: "contar_activos" });
-    if (data && data.ok && data.totalPersonas > 0) {
-      badge.textContent = data.totalPersonas + (data.totalDeptos > 1 ? " · " + data.totalDeptos + " deptos" : "");
-      fab.classList.remove("hidden");
-      // Pequeño delay para que la clase "hidden" se quite antes de animar la
-      // entrada (si no, la transición de opacity/translate no se ve).
-      requestAnimationFrame(() => fab.classList.remove("translate-y-4", "opacity-0"));
-    } else {
-      fab.classList.add("translate-y-4", "opacity-0");
-      setTimeout(() => { if (fab.classList.contains("opacity-0")) fab.classList.add("hidden"); }, 300);
-    }
+    aplicarVisibilidadFab(data);
   } catch (e) {
     // Silencioso: si falla la consulta del badge no debe interrumpir nada más.
+  }
+}
+
+// Separado de la llamada al backend para poder re-aplicar la visibilidad
+// solo por cambio de estado del sidebar, sin tener que volver a consultar.
+let ultimoConteoActivos = null;
+function aplicarVisibilidadFab(data) {
+  if (data) ultimoConteoActivos = data;
+  const info = ultimoConteoActivos;
+  const fab = document.getElementById("fabRegistrarSalida");
+  const badge = document.getElementById("fabBadge");
+  const menuBadge = document.getElementById("menuBadgeSalida");
+
+  const hayActivos = info && info.ok && info.totalPersonas > 0;
+  const textoBadge = hayActivos ? (info.totalPersonas + (info.totalDeptos > 1 ? " · " + info.totalDeptos + " deptos" : "")) : "";
+
+  // El botón del menú lateral SIEMPRE puede mostrar su badge (no depende de
+  // si el sidebar está abierto — de hecho solo se ve cuando SÍ está abierto).
+  if (hayActivos) {
+    menuBadge.textContent = textoBadge;
+    menuBadge.classList.remove("hidden");
+  } else {
+    menuBadge.classList.add("hidden");
+  }
+
+  // El flotante: en móvil se oculta mientras el sidebar está abierto (para
+  // no tapar el menú, que ya trae su propio botón con el mismo dato). En
+  // desktop el sidebar no se superpone al contenido, así que el flotante
+  // siempre sigue la regla normal de ocupación, sin importar el sidebar.
+  const esMobile = window.matchMedia("(max-width: 767px)").matches;
+  const ocultarPorSidebar = esMobile && sidebarMobileAbierto;
+
+  if (hayActivos && !ocultarPorSidebar) {
+    badge.textContent = textoBadge;
+    fab.classList.remove("hidden");
+    requestAnimationFrame(() => fab.classList.remove("translate-y-4", "opacity-0"));
+  } else {
+    fab.classList.add("translate-y-4", "opacity-0");
+    setTimeout(() => { if (fab.classList.contains("opacity-0")) fab.classList.add("hidden"); }, 300);
   }
 }
 
@@ -781,6 +815,18 @@ function abrirModalRegistrarSalida() {
   cargarRegistrosActivos();
 }
 function cerrarModalRegistrarSalida() { document.getElementById("modalRegistrarSalida").classList.add("hidden"); }
+
+// Genera <option>1</option>..<option>n</option> — el máximo activo queda
+// preseleccionado por default (salida completa), pero el guardia puede
+// elegir un número menor para una salida parcial. Nunca se puede escribir
+// un número inválido porque ya no es un campo de texto libre.
+function opcionesNumericas(n) {
+  let html = "";
+  for (let v = 1; v <= n; v++) {
+    html += `<option value="${v}"${v === n ? " selected" : ""}>${v}</option>`;
+  }
+  return html;
+}
 
 async function cargarRegistrosActivos() {
   const cont = document.getElementById("listaRegistrosActivos");
@@ -829,13 +875,19 @@ async function cargarRegistrosActivos() {
           <div class="grid grid-cols-2 gap-2 mt-2">
             <div>
               <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Residentes que salen</label>
-              <input id="salidaRes-${i}" type="number" min="0" max="${g.activosResidentes}" value="${g.activosResidentes}"
-                class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+              ${g.activosResidentes > 0
+                ? `<select id="salidaRes-${i}" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+                     ${opcionesNumericas(g.activosResidentes)}
+                   </select>`
+                : `<select id="salidaRes-${i}" disabled class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-slate-100 text-slate-400"><option value="0">— (0 activos)</option></select>`}
             </div>
             <div>
               <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Invitados que salen</label>
-              <input id="salidaInv-${i}" type="number" min="0" max="${g.activosInvitados}" value="${g.activosInvitados}"
-                class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+              ${g.activosInvitados > 0
+                ? `<select id="salidaInv-${i}" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+                     ${opcionesNumericas(g.activosInvitados)}
+                   </select>`
+                : `<select id="salidaInv-${i}" disabled class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-slate-100 text-slate-400"><option value="0">— (0 activos)</option></select>`}
             </div>
           </div>
           <button onclick="registrarSalidaClick('${escapeHtml(g.depto)}', '${escapeHtml(g.amenidad)}', ${i})" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
