@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbwHIr2zV95qfn12uV4qIwGmDLgXibDmuKt3ghgD043C-h_mTd1KdiXtcfBR4n09TWmJ-w/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbxjb75xmBbogZy-Q8Dv9dIy1l5dpriTAwhRY1rSVHcInZJuYfN7mLDYQnAcT_cO8bRE7g/exec"
 };
 
 let reglamentoData = [];
@@ -772,9 +772,18 @@ async function cargarRegistrosActivos() {
   // Un card por depto+amenidad con ocupación activa (puede venir de varias
   // llegadas distintas ya sumadas). El guardia declara cuántos residentes e
   // invitados salen AHORA — no tiene que ser el total, puede ser salida parcial.
-  cont.innerHTML = data.grupos.map((g, i) => `
+  // Vienen ya ordenados por amenidad desde el backend, así que solo hay que
+  // insertar un encabezado cuando cambia de amenidad respecto al anterior.
+  let html = "";
+  let amenidadAnterior = null;
+  data.grupos.forEach((g, i) => {
+    if (g.amenidad !== amenidadAnterior) {
+      html += `<p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide ${amenidadAnterior ? "mt-4" : ""} mb-1">${escapeHtml(g.amenidad)}</p>`;
+      amenidadAnterior = g.amenidad;
+    }
+    html += `
     <div class="border border-slate-200 rounded-xl p-3">
-      <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(g.depto)} · ${escapeHtml(g.amenidad)}</p>
+      <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(g.depto)}</p>
       <p class="text-[11px] text-slate-500 mt-0.5">
         Activos ahorita: <b>${g.activosResidentes} residente(s)</b>, <b>${g.activosInvitados} invitado(s)</b>
         ${g.primeraLlegadaTexto ? " · adentro desde " + escapeHtml(g.primeraLlegadaTexto) : ""}
@@ -793,7 +802,9 @@ async function cargarRegistrosActivos() {
       </div>
       <button onclick="registrarSalidaClick('${escapeHtml(g.depto)}', '${escapeHtml(g.amenidad)}', ${i})" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
     </div>
-  `).join("");
+  `;
+  });
+  cont.innerHTML = html;
 }
 
 async function registrarSalidaClick(depto, amenidad, i) {
