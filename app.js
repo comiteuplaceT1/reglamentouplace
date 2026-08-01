@@ -612,7 +612,7 @@ async function ejecutarConsultaDepto() {
   let colorMoroso = "bg-emerald-50 border-emerald-200 text-emerald-800";
   let tituloMoroso = "✅ Al corriente";
   if (m.accion === "bloqueado") { colorMoroso = "bg-red-50 border-red-300 text-red-800"; tituloMoroso = "🚫 MOROSO — NO SE PERMITE EL ACCESO"; }
-  else if (m.accion === "excepcion_petzone") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ MOROSO — excepción Pet Zone, SÍ se permite"; }
+  else if (m.accion === "excepcion_petzone") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ MOROSO — excepción Pet Zone, SÍ se permite - Registra su Entrada y Salida"; }
   else if (m.estatus && m.estatus.toLowerCase() === "moroso") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ Moroso"; }
 
   let html = `
