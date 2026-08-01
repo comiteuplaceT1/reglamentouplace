@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbxjb75xmBbogZy-Q8Dv9dIy1l5dpriTAwhRY1rSVHcInZJuYfN7mLDYQnAcT_cO8bRE7g/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbx1avTAWzBTMtbaiZ75c_WqrM1-aV7V8pJIeTlwXyKf6goaGVG-3rPmk8eehaekzbUsog/exec"
 };
 
 let reglamentoData = [];
@@ -612,6 +612,7 @@ async function ejecutarConsultaDepto() {
   let colorMoroso = "bg-emerald-50 border-emerald-200 text-emerald-800";
   let tituloMoroso = "✅ Al corriente";
   if (m.accion === "bloqueado") { colorMoroso = "bg-red-50 border-red-300 text-red-800"; tituloMoroso = "🚫 MOROSO — NO SE PERMITE EL ACCESO"; }
+  else if (m.accion === "excepcion_petzone") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ MOROSO — excepción Pet Zone, SÍ se permite"; }
   else if (m.estatus && m.estatus.toLowerCase() === "moroso") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ Moroso"; }
 
   let html = `
@@ -746,6 +747,30 @@ async function registrarIngresoAmenidad() {
   document.getElementById("resultadoConsultaDepto").insertAdjacentHTML("beforeend",
     `<p class="text-emerald-700 text-xs font-bold mt-2">✅ Ingreso registrado en la bitácora.</p>`);
   alert("✅ Registro guardado correctamente.");
+  actualizarFabSalida();
+}
+
+// =========================================================================
+// BOTÓN FLOTANTE — siempre visible mientras haya alguien activo sin salida
+// =========================================================================
+async function actualizarFabSalida() {
+  const fab = document.getElementById("fabRegistrarSalida");
+  const badge = document.getElementById("fabBadge");
+  try {
+    const data = await llamarBackend({ accion: "contar_activos" });
+    if (data && data.ok && data.totalPersonas > 0) {
+      badge.textContent = data.totalPersonas + (data.totalDeptos > 1 ? " · " + data.totalDeptos + " deptos" : "");
+      fab.classList.remove("hidden");
+      // Pequeño delay para que la clase "hidden" se quite antes de animar la
+      // entrada (si no, la transición de opacity/translate no se ve).
+      requestAnimationFrame(() => fab.classList.remove("translate-y-4", "opacity-0"));
+    } else {
+      fab.classList.add("translate-y-4", "opacity-0");
+      setTimeout(() => { if (fab.classList.contains("opacity-0")) fab.classList.add("hidden"); }, 300);
+    }
+  } catch (e) {
+    // Silencioso: si falla la consulta del badge no debe interrumpir nada más.
+  }
 }
 
 // =========================================================================
@@ -835,6 +860,7 @@ async function registrarSalidaClick(depto, amenidad, i) {
   alert("✅ Salida registrada correctamente (" + data.fechaSalida + "): " +
     data.residentesRegistrados + " residente(s) y " + data.invitadosRegistrados + " invitado(s).");
   cargarRegistrosActivos(); // refresca: si ya no queda nadie activo, el card desaparece solo
+  actualizarFabSalida();
 }
 
 // =========================================================================
@@ -992,6 +1018,12 @@ async function cargarPanelAdmin() {
 
   const body = document.getElementById("adminBody");
   body.innerHTML = `
+    <div class="border border-amber-200 bg-amber-50 rounded-xl p-3 mb-4">
+      <p class="text-xs font-bold text-amber-800">🌙 Cierre administrativo de registros</p>
+      <p class="text-[11px] text-amber-700 mt-1">Por si seguridad olvidó registrar alguna salida al final del día. Cierra TODO lo que siga activo (todos los deptos y amenidades) marcándolo como "CIERRE ADMIN", no como salida real. Solo funciona de 00:30 a 04:30 am, cuando no hay acceso a amenidades — así no se cierra por error algo del día siguiente.</p>
+      <button onclick="ejecutarCierreAdmin()" class="w-full mt-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg py-2 text-xs font-bold transition">Cerrar todos los registros activos</button>
+      <div id="resultadoCierreAdmin" class="mt-2"></div>
+    </div>
     <div class="grid grid-cols-4 gap-1.5 mb-4">
       ${TABS_ADMIN.map((t, i) => `<button id="tab${t.id}" class="text-[11px] font-bold py-2 rounded-lg transition ${i === 0 ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"}">${t.label}</button>`).join("")}
     </div>
@@ -1015,6 +1047,25 @@ async function cargarPanelAdmin() {
       });
     });
   });
+}
+
+// Acción destructiva-ish (fuerza salidas sin que seguridad las haya
+// registrado): pide confirmación explícita con el PIN de por medio, ya que
+// requiere estar en el Panel Admin. El backend valida además la ventana
+// horaria (00:30–04:30), así que aunque se presione fuera de horario no pasa
+// nada — solo regresa el error explicando por qué no se ejecutó.
+async function ejecutarCierreAdmin() {
+  if (!confirm("¿Cerrar TODOS los registros activos ahorita mismo? Esto marca como salida (etiquetado 'CIERRE ADMIN') a cualquier depto que haya quedado activo sin que seguridad registrara su salida. No se puede deshacer.")) return;
+  const resultado = document.getElementById("resultadoCierreAdmin");
+  resultado.innerHTML = `<p class="text-slate-500 text-xs">Cerrando…</p>`;
+  const data = await llamarBackend({ accion: "cerrar_todos_registros", pin: adminPin });
+  if (!data || !data.ok) {
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo ejecutar.")}</p>`;
+    return;
+  }
+  resultado.innerHTML = `<p class="text-emerald-700 text-xs font-bold">✅ Se cerraron ${data.renglonesCerrados} registro(s), ${data.personasCerradas} persona(s) en total.</p>
+    ${data.advertencia ? `<p class="text-amber-600 text-[11px] mt-1">⚠️ ${escapeHtml(data.advertencia)}</p>` : ""}`;
+  actualizarFabSalida();
 }
 
 function pintarPanelReglamento(articulos) {
@@ -1320,3 +1371,5 @@ cargarGuardias().finally(() => {
     pintarMensaje("Hola " + guardNombre.split(" ")[0] + ", soy el Agente de Reglamento y Amenidades de UPLACE Torre 1. Pregúntame qué se puede o no se puede, consulta un horario, o usa \"Consultar / Registrar Depto\" para verificar morosidad e invitados.", "bot");
   }
 });
+actualizarFabSalida();
+setInterval(actualizarFabSalida, 90000); // por si otro guardia registra/saca desde otra sesión

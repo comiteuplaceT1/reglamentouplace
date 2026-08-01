@@ -334,7 +334,17 @@
   </div>
 </div>
 
-<script src="app.js?v=20260731l"></script>
+<!-- Botón flotante: siempre visible mientras haya algún depto activo sin
+     salida registrada, para que a seguridad no se le olvide. Sube desde
+     abajo-derecha con una transición; oculto (translate-y + opacity 0)
+     cuando no hay nadie activo. -->
+<button id="fabRegistrarSalida" onclick="abrirModalRegistrarSalida()"
+  class="hidden fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full pl-4 pr-5 py-3 shadow-xl shadow-indigo-600/40 font-bold text-sm transition-all duration-300 translate-y-4 opacity-0">
+  🚪 <span>Registrar salida</span>
+  <span id="fabBadge" class="bg-white/20 rounded-full px-2 py-0.5 text-xs"></span>
+</button>
+
+<script src="app.js?v=20260731m"></script>
 
 </body>
 </html>
