@@ -219,9 +219,16 @@
         class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
 
       <label class="block text-[11px] font-bold text-slate-500 mb-1">Residentes adicionales del mismo depto (opcional)</label>
-      <input id="fConsultaResidentes" type="number" min="0" placeholder="0"
-        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
-      <p class="text-[10px] text-slate-400 mb-3">No cuentes a quien está registrando — solo pareja, hijos u otro residente del mismo depto que lo acompañe. Si viene solo, deja en 0.</p>
+      <select id="fConsultaResidentes"
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
+        <option value="0">0 — vino solo</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+      <p class="text-[10px] text-slate-400 mb-3">No cuentes a quien está registrando — solo pareja, hijos u otro residente del mismo depto que lo acompañe. Máximo 5, porque quien registra ya cuenta como huella #6 (el tope real de huellas por depto es 6).</p>
 
       <label class="block text-[11px] font-bold text-slate-500 mb-1">Número de invitados (opcional)</label>
       <input id="fConsultaInvitados" type="number" min="0" placeholder="0"
@@ -344,7 +351,7 @@
   <span id="fabBadge" class="bg-white/20 rounded-full px-2 py-0.5 text-xs"></span>
 </button>
 
-<script src="app.js?v=20260731m"></script>
+<script src="app.js?v=20260731o"></script>
 
 </body>
 </html>

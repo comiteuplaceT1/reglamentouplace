@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbx1avTAWzBTMtbaiZ75c_WqrM1-aV7V8pJIeTlwXyKf6goaGVG-3rPmk8eehaekzbUsog/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbxwmrOJ4K4APgOJJnRwu4GUvAQvomS1a60gx7nt2RjtBcPOprXSDYZm0rWPEAlQt9V9gQ/exec"
 };
 
 let reglamentoData = [];
@@ -612,7 +612,7 @@ async function ejecutarConsultaDepto() {
   let colorMoroso = "bg-emerald-50 border-emerald-200 text-emerald-800";
   let tituloMoroso = "✅ Al corriente";
   if (m.accion === "bloqueado") { colorMoroso = "bg-red-50 border-red-300 text-red-800"; tituloMoroso = "🚫 MOROSO — NO SE PERMITE EL ACCESO"; }
-  else if (m.accion === "excepcion_petzone") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ MOROSO — excepción Pet Zone, SÍ se permite - Registra su Entrada y Salida"; }
+  else if (m.accion === "excepcion_petzone") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ MOROSO — excepción Pet Zone, SÍ se permite"; }
   else if (m.estatus && m.estatus.toLowerCase() === "moroso") { colorMoroso = "bg-amber-50 border-amber-300 text-amber-800"; tituloMoroso = "⚠️ Moroso"; }
 
   let html = `
@@ -791,43 +791,58 @@ async function cargarRegistrosActivos() {
     return;
   }
   if (!data.grupos.length) {
-    cont.innerHTML = `<p class="text-slate-500 text-xs">No hay nadie activo ahorita — todos tienen salida registrada.</p>`;
+    cont.innerHTML = `<p class="text-slate-500 text-xs">No hay nadie activo ahorita del día de hoy — todos tienen salida registrada.</p>`;
     return;
   }
-  // Un card por depto+amenidad con ocupación activa (puede venir de varias
-  // llegadas distintas ya sumadas). El guardia declara cuántos residentes e
-  // invitados salen AHORA — no tiene que ser el total, puede ser salida parcial.
-  // Vienen ya ordenados por amenidad desde el backend, así que solo hay que
-  // insertar un encabezado cuando cambia de amenidad respecto al anterior.
+  // Menú de dos niveles: primero la amenidad (colapsada), al abrirla aparece
+  // el listado de deptos activos en ESA amenidad — así no es un listado
+  // plano gigante. Vienen ya ordenados por amenidad y, dentro de cada una,
+  // por llegada más antigua primero (el más reciente queda hasta abajo).
+  const porAmenidad = {};
+  data.grupos.forEach(g => {
+    if (!porAmenidad[g.amenidad]) porAmenidad[g.amenidad] = [];
+    porAmenidad[g.amenidad].push(g);
+  });
+
   let html = "";
-  let amenidadAnterior = null;
-  data.grupos.forEach((g, i) => {
-    if (g.amenidad !== amenidadAnterior) {
-      html += `<p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide ${amenidadAnterior ? "mt-4" : ""} mb-1">${escapeHtml(g.amenidad)}</p>`;
-      amenidadAnterior = g.amenidad;
-    }
+  let idxGlobal = 0;
+  Object.keys(porAmenidad).forEach((amenidad, ai) => {
+    const items = porAmenidad[amenidad];
+    const totalPersonas = items.reduce((s, g) => s + g.activosResidentes + g.activosInvitados, 0);
     html += `
-    <div class="border border-slate-200 rounded-xl p-3">
-      <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(g.depto)}</p>
-      <p class="text-[11px] text-slate-500 mt-0.5">
-        Activos ahorita: <b>${g.activosResidentes} residente(s)</b>, <b>${g.activosInvitados} invitado(s)</b>
-        ${g.primeraLlegadaTexto ? " · adentro desde " + escapeHtml(g.primeraLlegadaTexto) : ""}
-      </p>
-      <div class="grid grid-cols-2 gap-2 mt-2">
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Residentes que salen</label>
-          <input id="salidaRes-${i}" type="number" min="0" max="${g.activosResidentes}" value="${g.activosResidentes}"
-            class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+      <details class="border border-slate-200 rounded-xl overflow-hidden">
+        <summary class="cursor-pointer select-none list-none flex items-center justify-between px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-xs font-bold text-indigo-900 transition">
+          <span>${escapeHtml(amenidad)}</span>
+          <span class="text-[10px] font-normal text-indigo-600">${items.length} depto(s) · ${totalPersonas} activo(s)</span>
+        </summary>
+        <div class="p-2 space-y-2 bg-white">
+    `;
+    items.forEach(g => {
+      const i = idxGlobal++;
+      html += `
+        <div class="border border-slate-200 rounded-xl p-3">
+          <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(g.depto)}${g.nombreResidentePresenta ? " - " + escapeHtml(g.nombreResidentePresenta) : ""}</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">
+            Activos ahorita: <b>${g.activosResidentes} residente(s)</b>, <b>${g.activosInvitados} invitado(s)</b>
+            ${g.primeraLlegadaTexto ? " · adentro desde " + escapeHtml(g.primeraLlegadaTexto) : ""}
+          </p>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Residentes que salen</label>
+              <input id="salidaRes-${i}" type="number" min="0" max="${g.activosResidentes}" value="${g.activosResidentes}"
+                class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Invitados que salen</label>
+              <input id="salidaInv-${i}" type="number" min="0" max="${g.activosInvitados}" value="${g.activosInvitados}"
+                class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+            </div>
+          </div>
+          <button onclick="registrarSalidaClick('${escapeHtml(g.depto)}', '${escapeHtml(g.amenidad)}', ${i})" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
         </div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Invitados que salen</label>
-          <input id="salidaInv-${i}" type="number" min="0" max="${g.activosInvitados}" value="${g.activosInvitados}"
-            class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
-        </div>
-      </div>
-      <button onclick="registrarSalidaClick('${escapeHtml(g.depto)}', '${escapeHtml(g.amenidad)}', ${i})" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-[11px] font-bold transition">Registrar salida</button>
-    </div>
-  `;
+      `;
+    });
+    html += `</div></details>`;
   });
   cont.innerHTML = html;
 }
@@ -1018,6 +1033,13 @@ async function cargarPanelAdmin() {
 
   const body = document.getElementById("adminBody");
   body.innerHTML = `
+    <div class="border border-sky-200 bg-sky-50 rounded-xl p-3 mb-3">
+      <p class="text-xs font-bold text-sky-800">📦 Archivado mensual</p>
+      <p class="text-[11px] text-sky-700 mt-1">Bitacora_Reservaciones y Consultas_Seguridad se vacían solas cada día 1 del mes; lo del mes anterior se mueve a pestañas nuevas ("Bitacora Julio 2026", etc.) en este mismo Sheet. Instálalo una sola vez.</p>
+      <button onclick="ejecutarInstalarTriggerArchivo()" class="w-full mt-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg py-2 text-xs font-bold transition">Activar automatización mensual (una sola vez)</button>
+      <button onclick="ejecutarArchivarAhora()" class="w-full mt-1.5 bg-white border border-sky-300 hover:bg-sky-100 text-sky-700 rounded-lg py-2 text-xs font-bold transition">Archivar meses anteriores ahora (manual)</button>
+      <div id="resultadoArchivado" class="mt-2"></div>
+    </div>
     <div class="border border-amber-200 bg-amber-50 rounded-xl p-3 mb-4">
       <p class="text-xs font-bold text-amber-800">🌙 Cierre administrativo de registros</p>
       <p class="text-[11px] text-amber-700 mt-1">Por si seguridad olvidó registrar alguna salida al final del día. Cierra TODO lo que siga activo (todos los deptos y amenidades) marcándolo como "CIERRE ADMIN", no como salida real. Solo funciona de 00:30 a 04:30 am, cuando no hay acceso a amenidades — así no se cierra por error algo del día siguiente.</p>
@@ -1047,6 +1069,39 @@ async function cargarPanelAdmin() {
       });
     });
   });
+}
+
+// Se llama UNA sola vez: deja instalado el trigger que corre solo cada día 1
+// del mes. Si se presiona otra vez por error, el backend reemplaza el
+// trigger anterior en vez de duplicarlo.
+async function ejecutarInstalarTriggerArchivo() {
+  const resultado = document.getElementById("resultadoArchivado");
+  resultado.innerHTML = `<p class="text-slate-500 text-xs">Activando…</p>`;
+  const data = await llamarBackend({ accion: "instalar_trigger_mensual", pin: adminPin });
+  if (!data || !data.ok) {
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo activar.")}</p>`;
+    return;
+  }
+  resultado.innerHTML = `<p class="text-emerald-700 text-xs font-bold">✅ Automatización activada — correrá sola cada día 1 del mes a la 1am.</p>`;
+}
+
+async function ejecutarArchivarAhora() {
+  if (!confirm("¿Archivar ahora todo lo de meses anteriores en Bitacora_Reservaciones y Consultas_Seguridad? Lo activo se queda en vivo, el resto se mueve a pestañas por mes.")) return;
+  const resultado = document.getElementById("resultadoArchivado");
+  resultado.innerHTML = `<p class="text-slate-500 text-xs">Archivando…</p>`;
+  const data = await llamarBackend({ accion: "archivar_mensual_ahora", pin: adminPin });
+  if (!data || !data.ok) {
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml((data && data.error) || "No se pudo archivar.")}</p>`;
+    return;
+  }
+  const bit = data.resultado.bitacora || {};
+  const con = data.resultado.consultas || {};
+  const partes = [];
+  Object.keys(bit).forEach(m => partes.push("Bitácora " + m + ": " + bit[m]));
+  Object.keys(con).forEach(m => partes.push("Consultas " + m + ": " + con[m]));
+  resultado.innerHTML = partes.length
+    ? `<p class="text-emerald-700 text-xs font-bold">✅ Archivado:</p><p class="text-[11px] text-slate-600">${partes.map(escapeHtml).join(" · ")}</p>`
+    : `<p class="text-slate-500 text-xs">No había nada de meses anteriores por archivar.</p>`;
 }
 
 // Acción destructiva-ish (fuerza salidas sin que seguridad las haya
