@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbwgDPvWpBt0axdPhJoCmqMN3xEgCwwxD71_cMHMlHdZ0Fd_mRun7Tw_yal24runQSthaA/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbxkuFNmhwMDqs7CxJ8rahZ_xByrc5eMNWnT9m6M2rItvja_MlgcsPupHlhhNQ0KOVnOxw/exec"
 };
 
 let reglamentoData = [];
@@ -1202,7 +1202,7 @@ async function cargarPanelAdmin() {
   body.innerHTML = `
     <div class="border border-sky-200 bg-sky-50 rounded-xl p-3 mb-3">
       <p class="text-xs font-bold text-sky-800">📦 Archivado mensual</p>
-      <p class="text-[11px] text-sky-700 mt-1">Bitacora_Reservaciones y Consultas_Seguridad se vacían solas cada día 1 del mes; lo del mes anterior se mueve a pestañas nuevas ("Bitacora Julio 2026", etc.) en este mismo Sheet.</p>
+      <p class="text-[11px] text-sky-700 mt-1">Bitacora_Reservaciones y Consultas_Seguridad se vacían solas cada día 1 del mes; lo del mes anterior se mueve a pestañas ("Bitacora Julio 2026", etc.) en una Sheet de Google APARTE llamada "Bitacora Agente Reglamentos" — así esta hoja principal no se llena de pestañas.</p>
       <div class="mt-2 rounded-lg px-3 py-2 text-xs font-bold ${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}">
         ${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado
           ? "✅ Automatización ACTIVA — corre sola cada día 1 a la 1am. Puedes desactivarla abajo si lo necesitas."
@@ -1210,6 +1210,7 @@ async function cargarPanelAdmin() {
       </div>
       <button onclick="${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "ejecutarDesactivarTriggerArchivo()" : "ejecutarInstalarTriggerArchivo()"}" class="w-full mt-2 ${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "bg-red-600 hover:bg-red-700" : "bg-sky-600 hover:bg-sky-700"} text-white rounded-lg py-2 text-xs font-bold transition">${estadoTrigger && estadoTrigger.ok && estadoTrigger.instalado ? "Desactivar automatización mensual" : "Activar automatización mensual (una sola vez)"}</button>
       <button onclick="ejecutarArchivarAhora()" class="w-full mt-1.5 bg-white border border-sky-300 hover:bg-sky-100 text-sky-700 rounded-lg py-2 text-xs font-bold transition">Archivar meses anteriores ahora (manual)</button>
+      <button onclick="ejecutarAbrirArchivo()" class="w-full mt-1.5 bg-white border border-sky-300 hover:bg-sky-100 text-sky-700 rounded-lg py-2 text-xs font-bold transition">📂 Abrir la Sheet de archivo</button>
       <div id="resultadoArchivado" class="mt-2"></div>
     </div>
     <div class="border border-amber-200 bg-amber-50 rounded-xl p-3 mb-4">
@@ -1288,6 +1289,18 @@ async function ejecutarArchivarAhora() {
   resultado.innerHTML = partes.length
     ? `<p class="text-emerald-700 text-xs font-bold">✅ Archivado:</p><p class="text-[11px] text-slate-600">${partes.map(escapeHtml).join(" · ")}</p>`
     : `<p class="text-slate-500 text-xs">No había nada de meses anteriores por archivar.</p>`;
+}
+
+async function ejecutarAbrirArchivo() {
+  const resultado = document.getElementById("resultadoArchivado");
+  resultado.innerHTML = `<p class="text-slate-500 text-xs">Abriendo…</p>`;
+  const data = await llamarBackend({ accion: "obtener_link_archivo", pin: adminPin });
+  if (!data || !data.ok) {
+    resultado.innerHTML = `<p class="text-red-600 text-xs font-bold">${escapeHtml(mensajeError(data, "No se pudo abrir la Sheet de archivo."))}</p>`;
+    return;
+  }
+  resultado.innerHTML = `<p class="text-slate-500 text-xs">Abierta en una pestaña nueva: "${escapeHtml(data.nombre)}".</p>`;
+  window.open(data.url, "_blank");
 }
 
 // Acción destructiva-ish (fuerza salidas sin que seguridad las haya
