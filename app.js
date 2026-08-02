@@ -422,24 +422,36 @@ function abrirModalIdentidad() {
   document.getElementById("modalIdentidad").classList.remove("hidden");
 }
 
-// Si el NOMBRE elegido del catálogo empieza con "Administración -" o
-// "Comité -" (ej. "Administración - Cristian Lara", "Comité - Pablo"), el
-// Puesto queda fijo a esa área y no se puede cambiar — evita que alguien de
-// Administración quede registrado con puesto de Guardia por error. Para
-// cualquier otro nombre, el select de Puesto sigue con todas sus opciones
-// libres, tal como estaba.
+// Según el prefijo del NOMBRE elegido del catálogo, se restringe qué puede
+// elegir en "Tu puesto":
+//   "Administración - Nombre" -> Puesto fijo en "Administración", bloqueado.
+//   "Comité - Nombre"         -> Puesto fijo en "Comité de Vigilancia", bloqueado.
+//   "Seguridad - Nombre"      -> Puesto libre, pero SOLO entre las opciones
+//                                 operativas (Guardia/Jefe/Recepcionista/Otro);
+//                                 Administración y Comité quedan ocultas.
+//   Cualquier otro nombre     -> Puesto totalmente libre, todas las opciones.
 function aplicarRestriccionPuesto(nombre) {
   const selectPuesto = document.getElementById("fIdentidadPuesto");
   const normalizado = String(nombre || "").trim().toLowerCase();
-  let forzado = null;
-  if (/^administraci[oó]n\s*-/.test(normalizado)) forzado = "Administración";
-  else if (/^comit[eé]\s*-/.test(normalizado)) forzado = "Comité de Vigilancia";
+  const opciones = Array.from(selectPuesto.options);
 
-  if (forzado) {
-    selectPuesto.value = forzado;
+  if (/^administraci[oó]n\s*-/.test(normalizado)) {
+    opciones.forEach(opt => { opt.hidden = false; });
+    selectPuesto.value = "Administración";
     selectPuesto.disabled = true;
+  } else if (/^comit[eé]\s*-/.test(normalizado)) {
+    opciones.forEach(opt => { opt.hidden = false; });
+    selectPuesto.value = "Comité de Vigilancia";
+    selectPuesto.disabled = true;
+  } else if (/^seguridad\s*-/.test(normalizado)) {
+    selectPuesto.disabled = false;
+    opciones.forEach(opt => { opt.hidden = (opt.value === "Administración" || opt.value === "Comité de Vigilancia"); });
+    if (selectPuesto.selectedOptions[0] && selectPuesto.selectedOptions[0].hidden) {
+      selectPuesto.value = "Guardia de Turno";
+    }
   } else {
     selectPuesto.disabled = false;
+    opciones.forEach(opt => { opt.hidden = false; });
   }
 }
 
