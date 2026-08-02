@@ -717,7 +717,7 @@ async function ejecutarConsultaDepto() {
     } else {
       colorResidentes = "border-red-200 bg-red-50";
       residentesTxt = r.activosAhora > 0
-        ? `<p class="text-xs font-bold text-red-700 mt-1">🚫 Ahorita solo caben ${r.disponibles} de los ${r.totalResidentesVisita} residentes declarados — ya hay ${r.activosAhora} activo(s) en esta amenidad (huellas registradas: ${r.huellasRegistradas}).</p>`
+        ? `<p class="text-xs font-bold text-red-700 mt-1">🚫 Ahora solo caben ${r.disponibles} de los ${r.totalResidentesVisita} residentes declarados — ya hay ${r.activosAhora} activo(s) en esta amenidad (huellas registradas: ${r.huellasRegistradas}).</p>`
         : `<p class="text-xs font-bold text-red-700 mt-1">🚫 Supera las huellas disponibles: ${r.totalResidentesVisita} residentes declarados, pero el depto solo tiene ${r.huellasRegistradas} huella(s) registrada(s).</p>`;
     }
     html += `
@@ -748,12 +748,22 @@ async function ejecutarConsultaDepto() {
       permitidoTxt = `<p class="text-xs text-slate-600 mt-1">Sin límite de invitados registrado por recámara para esta amenidad — revisa las restricciones abajo.</p>`;
     } else {
       const ok = am.permitido;
-      if (ok) {
+      // Si cumple la cuota de invitados por recámara PERO el área ya no
+      // tiene cupo físico (se sabe por am.permitidoCapacidad, calculado más
+      // abajo), no se debe decir "✅ Puede pasar" aquí — sería contradictorio
+      // con el bloqueo rojo de capacidad que sale justo debajo. En ese caso
+      // se muestra un mensaje neutral: cumple la cuota, pero la decisión
+      // final depende del cupo del área.
+      const bloqueaCapacidad = am.capacidadTotal !== null && am.permitidoCapacidad === false;
+      if (ok && !bloqueaCapacidad) {
         permitidoTxt = `<p class="text-xs mt-1 font-bold text-emerald-700">✅ Puede pasar con sus ${am.invitadosSolicitados} invitado(s).</p>
           <p class="text-[11px] text-slate-500 mt-0.5">Disponibles ahora: ${am.invitadosDisponibles} de ${am.limiteInvitados}${am.invitadosActivosAhora ? " · ya hay " + am.invitadosActivosAhora + " invitado(s) activo(s) en esta amenidad" : ""}.</p>`;
+      } else if (ok && bloqueaCapacidad) {
+        permitidoTxt = `<p class="text-xs mt-1 font-bold text-slate-800">📋 Cuota de invitados por recámara: hasta ${am.limiteInvitados} permitidos — trae ${am.invitadosSolicitados}, sí alcanza según este límite.</p>
+          <p class="text-[11px] text-amber-700 font-bold mt-0.5">⚠️ Pero revisa el cupo del área abajo: puede que de todos modos no haya espacio físico ahora.</p>`;
       } else {
         permitidoTxt = am.invitadosActivosAhora > 0
-          ? `<p class="text-xs mt-1 font-bold text-red-700">🚫 Ahorita solo caben ${am.invitadosDisponibles} de los ${am.invitadosSolicitados} invitados declarados — ya hay ${am.invitadosActivosAhora} activo(s) (límite ${am.limiteInvitados}).</p>`
+          ? `<p class="text-xs mt-1 font-bold text-red-700">🚫 Ahora solo caben ${am.invitadosDisponibles} de los ${am.invitadosSolicitados} invitados declarados — ya hay ${am.invitadosActivosAhora} activo(s) (límite ${am.limiteInvitados}).</p>`
           : `<p class="text-xs mt-1 font-bold text-red-700">🚫 Excede el límite de invitados (máximo ${am.limiteInvitados}).</p>`;
       }
     }
