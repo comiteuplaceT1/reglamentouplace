@@ -418,21 +418,53 @@ function abrirModalIdentidad() {
     manual.value = "";
   }
   document.getElementById("fIdentidadPuesto").value = guardPuesto || "Guardia de Turno";
+  aplicarRestriccionPuesto(select.value === "__otro__" ? manual.value : select.value);
   document.getElementById("modalIdentidad").classList.remove("hidden");
 }
+
+// Si el NOMBRE elegido del catálogo empieza con "Administración -" o
+// "Comité -" (ej. "Administración - Cristian Lara", "Comité - Pablo"), el
+// Puesto queda fijo a esa área y no se puede cambiar — evita que alguien de
+// Administración quede registrado con puesto de Guardia por error. Para
+// cualquier otro nombre, el select de Puesto sigue con todas sus opciones
+// libres, tal como estaba.
+function aplicarRestriccionPuesto(nombre) {
+  const selectPuesto = document.getElementById("fIdentidadPuesto");
+  const normalizado = String(nombre || "").trim().toLowerCase();
+  let forzado = null;
+  if (/^administraci[oó]n\s*-/.test(normalizado)) forzado = "Administración";
+  else if (/^comit[eé]\s*-/.test(normalizado)) forzado = "Comité de Vigilancia";
+
+  if (forzado) {
+    selectPuesto.value = forzado;
+    selectPuesto.disabled = true;
+  } else {
+    selectPuesto.disabled = false;
+  }
+}
+
 // Al elegir "Otro" (no está en el catálogo Personal_Seguridad) se revela el
 // campo de texto libre. El Puesto ya NO se autocompleta desde el Sheet — se
-// sigue eligiendo a mano en su propio select, como estaba antes.
+// sigue eligiendo a mano en su propio select, como estaba antes (salvo la
+// restricción de Administración/Comité de arriba).
 document.getElementById("fIdentidadNombreSelect").addEventListener("change", (e) => {
   const manual = document.getElementById("fIdentidadNombreManual");
   if (e.target.value === "__otro__") {
     manual.classList.remove("hidden");
     manual.value = "";
     manual.focus();
+    aplicarRestriccionPuesto(""); // texto libre: sin restricción hasta que escriba algo
   } else {
     manual.classList.add("hidden");
     manual.value = "";
+    aplicarRestriccionPuesto(e.target.value);
   }
+});
+// Si escribe manualmente un nombre con el prefijo "Administración -" o
+// "Comité -" (guardia nuevo que aún no está en el catálogo), aplica la misma
+// restricción mientras escribe.
+document.getElementById("fIdentidadNombreManual").addEventListener("input", (e) => {
+  aplicarRestriccionPuesto(e.target.value);
 });
 function cerrarModalIdentidad() {
   // Solo se puede cerrar si ya hay una identidad guardada (no se puede usar
