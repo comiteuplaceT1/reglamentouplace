@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzNunq_KOiRu_TuNwwCJatzoYbsaZ69uY3C8rfz6wdFT-SijUw_vZMV2BXCqEPEY3xuBA/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbw1bFhbWR3FS3JgDyD3RSuxMMonu5o0XQ89MXzhOoiMr7q_7teMxyYfZof87hGvhKFtkQ/exec"
 };
 
 let reglamentoData = [];
@@ -712,7 +712,7 @@ async function ejecutarConsultaDepto() {
       residentesTxt = `<p class="text-xs text-slate-600 mt-1">Total: <b>${r.totalResidentesVisita}</b> residente(s) del depto (quien registra${r.numResidentesAdicionales ? " + " + r.numResidentesAdicionales + " más" : ""}). Sin huellas registradas para este depto — verifica manualmente.</p>`;
     } else if (r.permitido) {
       colorResidentes = "border-emerald-200 bg-emerald-50";
-      residentesTxt = `<p class="text-xs font-bold text-emerald-700 mt-1">✅ Puede pasar: caben ${r.totalResidentesVisita} de ${r.disponibles} disponible(s) ahorita.</p>
+      residentesTxt = `<p class="text-xs font-bold text-emerald-700 mt-1">✅ Puede pasar: caben ${r.totalResidentesVisita} de ${r.disponibles} disponible(s) ahora.</p>
         <p class="text-[11px] text-slate-500 mt-0.5">Huellas registradas: ${r.huellasRegistradas}${r.activosAhora ? " · ya hay " + r.activosAhora + " residente(s) activo(s) en esta amenidad" : ""}.</p>`;
     } else {
       colorResidentes = "border-red-200 bg-red-50";
@@ -750,7 +750,7 @@ async function ejecutarConsultaDepto() {
       const ok = am.permitido;
       if (ok) {
         permitidoTxt = `<p class="text-xs mt-1 font-bold text-emerald-700">✅ Puede pasar con sus ${am.invitadosSolicitados} invitado(s).</p>
-          <p class="text-[11px] text-slate-500 mt-0.5">Disponibles ahorita: ${am.invitadosDisponibles} de ${am.limiteInvitados}${am.invitadosActivosAhora ? " · ya hay " + am.invitadosActivosAhora + " invitado(s) activo(s) en esta amenidad" : ""}.</p>`;
+          <p class="text-[11px] text-slate-500 mt-0.5">Disponibles ahora: ${am.invitadosDisponibles} de ${am.limiteInvitados}${am.invitadosActivosAhora ? " · ya hay " + am.invitadosActivosAhora + " invitado(s) activo(s) en esta amenidad" : ""}.</p>`;
       } else {
         permitidoTxt = am.invitadosActivosAhora > 0
           ? `<p class="text-xs mt-1 font-bold text-red-700">🚫 Ahorita solo caben ${am.invitadosDisponibles} de los ${am.invitadosSolicitados} invitados declarados — ya hay ${am.invitadosActivosAhora} activo(s) (límite ${am.limiteInvitados}).</p>`
@@ -759,12 +759,21 @@ async function ejecutarConsultaDepto() {
     }
 
     // ---------- Capacidad total del área (todos los deptos combinados) ----------
+    // La ocupación actual se muestra SIEMPRE (pase o no pase la verificación),
+    // no solo cuando sí cabe — para que el guardia tenga el dato de contexto
+    // en cualquier caso. Y se distinguen dos motivos de bloqueo distintos,
+    // porque no es lo mismo: "ya hay gente adentro y no alcanza" (ocupación >
+    // 0) que "tu grupo por sí solo ya supera el máximo del área" (aunque esté
+    // vacía, ocupación = 0) — antes ambos casos usaban el mismo texto y con
+    // 0 ocupados sonaba contradictorio.
     let capacidadTxt = "";
     if (am.capacidadTotal !== null) {
-      if (am.permitidoCapacidad) {
-        capacidadTxt = `<p class="text-[11px] text-slate-500 mt-1">Cupo del área: ${am.ocupacionTotalAhora} de ${am.capacidadTotal} ocupado ahorita (contando a todos los deptos, no solo este).</p>`;
-      } else {
-        capacidadTxt = `<p class="text-xs mt-1 font-bold text-red-700">🚫 No caben en el área: hay ${am.ocupacionTotalAhora} de ${am.capacidadTotal} lugares ocupados (de todos los registros en el área combinados) — no hay espacio para ${am.totalPersonasSolicitadas} más. Solicita al condómino que baje el número de invitados, o lamentablemente no podrá utilizar el área por ahora.</p>`;
+      capacidadTxt = `<p class="text-[11px] text-slate-500 mt-1">Cupo del área: ${am.ocupacionTotalAhora} de ${am.capacidadTotal} lo están ocupando ahora (contando a todos los registros, no solo este).</p>`;
+      if (!am.permitidoCapacidad) {
+        const motivo = am.ocupacionTotalAhora > 0
+          ? `Ya hay ${am.ocupacionTotalAhora} persona(s) en el área ahora, solo caben ${am.capacidadDisponible} más — no alcanza para los ${am.totalPersonasSolicitadas} que trae este grupo.`
+          : `El grupo que trae (${am.totalPersonasSolicitadas} persona(s)) por sí solo ya supera el máximo del área (${am.capacidadTotal}).`;
+        capacidadTxt += `<p class="text-xs mt-1 font-bold text-red-700">🚫 No caben en el área: ${motivo} Solicita al condómino que baje el número de invitados, o lamentablemente no podrá utilizar el área por ahora.</p>`;
       }
     }
 
@@ -922,7 +931,7 @@ async function cargarRegistrosActivos() {
     return;
   }
   if (!data.grupos.length) {
-    cont.innerHTML = `<p class="text-slate-500 text-xs">No hay nadie activo ahorita del día de hoy — todos tienen salida registrada.</p>`;
+    cont.innerHTML = `<p class="text-slate-500 text-xs">No hay nadie activo ahora del día de hoy — todos tienen salida registrada.</p>`;
     return;
   }
   // Menú de dos niveles: primero la amenidad (colapsada), al abrirla aparece
@@ -954,7 +963,7 @@ async function cargarRegistrosActivos() {
         <div class="border border-slate-200 rounded-xl p-3">
           <p class="text-xs font-bold text-slate-800">Depto ${escapeHtml(g.depto)}${g.nombreResidentePresenta ? " - " + escapeHtml(g.nombreResidentePresenta) : ""}</p>
           <p class="text-[11px] text-slate-500 mt-0.5">
-            Activos ahorita: <b>${g.activosResidentes} residente(s)</b>, <b>${g.activosInvitados} invitado(s)</b>
+            Activos ahora: <b>${g.activosResidentes} residente(s)</b>, <b>${g.activosInvitados} invitado(s)</b>
             ${g.primeraLlegadaTexto ? " · adentro desde " + escapeHtml(g.primeraLlegadaTexto) : ""}
           </p>
           <div class="grid grid-cols-2 gap-2 mt-2">
@@ -1267,7 +1276,7 @@ async function ejecutarArchivarAhora() {
 // horaria (00:30–04:30), así que aunque se presione fuera de horario no pasa
 // nada — solo regresa el error explicando por qué no se ejecutó.
 async function ejecutarCierreAdmin() {
-  if (!confirm("¿Cerrar TODOS los registros activos ahorita mismo? Esto marca como salida (etiquetado 'CIERRE ADMIN') a cualquier depto que haya quedado activo sin que seguridad registrara su salida. No se puede deshacer.")) return;
+  if (!confirm("¿Cerrar TODOS los registros activos ahora mismo? Esto marca como salida (etiquetado 'CIERRE ADMIN') a cualquier depto que haya quedado activo sin que seguridad registrara su salida. No se puede deshacer.")) return;
   const resultado = document.getElementById("resultadoCierreAdmin");
   resultado.innerHTML = `<p class="text-slate-500 text-xs">Cerrando…</p>`;
   const data = await llamarBackend({ accion: "cerrar_todos_registros", pin: adminPin });
