@@ -483,6 +483,19 @@ function cerrarModalIdentidad() {
   // el chat de forma anónima, para que las consultas queden a nombre de alguien).
   if (guardNombre) document.getElementById("modalIdentidad").classList.add("hidden");
 }
+function mostrarBienvenida() {
+  pintarMensaje(
+    "Hola " + guardNombre.split(" ")[0] + ", soy el Agente de Reglamento y Amenidades de UPLACE Torre 1.\n\n" +
+    "Puedes preguntarme qué se puede o no se puede según el reglamento, o consultar el horario y restricciones de cualquier amenidad. También tienes estos botones en el menú:\n" +
+    "🏠 Consultar / Registrar Depto — verificar morosidad, huellas e invitados, y registrar el ingreso a una amenidad.\n" +
+    "🚪 Registrar salida — cuando un residente se retire.\n" +
+    "🚨 Reportar incidente — si alguien incumple una norma.\n" +
+    "📦 Verificar Paquetería — solo morosidad, para Lobby.\n\n" +
+    "⚠️ Importante: al terminar tu turno, usa siempre \"Cerrar sesión\" (junto a tu nombre) para que el compañero que sigue entre con la suya. Si no cierras sesión, lo que él registre puede quedar a tu nombre y afectarte después.",
+    "bot"
+  );
+}
+
 function guardarIdentidad() {
   const select = document.getElementById("fIdentidadNombreSelect");
   const nombre = (select.value === "__otro__")
@@ -500,6 +513,9 @@ function guardarIdentidad() {
   document.getElementById("errorIdentidad").classList.add("hidden");
   actualizarBadgeGuardia();
   document.getElementById("modalIdentidad").classList.add("hidden");
+  // Solo la primera vez (chat vacío) — si solo estaba corrigiendo su nombre
+  // con "Cambiar", no hace falta repetir el mensaje de bienvenida.
+  if (messagesEl.children.length === 0) mostrarBienvenida();
 }
 function cambiarGuardia() {
   abrirModalIdentidad();
@@ -1550,7 +1566,7 @@ cargarGuardias().finally(() => {
   if (!guardNombre) {
     abrirModalIdentidad();
   } else {
-    pintarMensaje("Hola " + guardNombre.split(" ")[0] + ", soy el Agente de Reglamento y Amenidades de UPLACE Torre 1. Pregúntame qué se puede o no se puede, consulta un horario, o usa \"Consultar / Registrar Depto\" para verificar morosidad e invitados.", "bot");
+    mostrarBienvenida();
   }
 });
 actualizarFabSalida();
