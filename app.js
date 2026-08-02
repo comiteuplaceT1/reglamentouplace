@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbw_QUTTZ9mTdBvLujC5EWL3bHU_XGd73dnFMVsemxBQmq1oX5lW_ytBTfVzXNMhpmCg5A/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzNunq_KOiRu_TuNwwCJatzoYbsaZ69uY3C8rfz6wdFT-SijUw_vZMV2BXCqEPEY3xuBA/exec"
 };
 
 let reglamentoData = [];
@@ -758,25 +758,39 @@ async function ejecutarConsultaDepto() {
       }
     }
 
+    // ---------- Capacidad total del área (todos los deptos combinados) ----------
+    let capacidadTxt = "";
+    if (am.capacidadTotal !== null) {
+      if (am.permitidoCapacidad) {
+        capacidadTxt = `<p class="text-[11px] text-slate-500 mt-1">Cupo del área: ${am.ocupacionTotalAhora} de ${am.capacidadTotal} ocupado ahorita (contando a todos los deptos, no solo este).</p>`;
+      } else {
+        capacidadTxt = `<p class="text-xs mt-1 font-bold text-red-700">🚫 No caben en el área: hay ${am.ocupacionTotalAhora} de ${am.capacidadTotal} lugares ocupados (de todos los registros en el área combinados) — no hay espacio para ${am.totalPersonasSolicitadas} más. Solicita al condómino que baje el número de invitados, o lamentablemente no podrá utilizar el área por ahora.</p>`;
+      }
+    }
+
     // El botón de registrar ingreso se bloquea (gris, no clicable) si el
     // depto está moroso-bloqueado, si los residentes exceden las huellas
-    // registradas, o si los invitados exceden el límite de la amenidad —
-    // en cualquiera de esos casos no debe poder registrarse el ingreso.
+    // registradas, si los invitados exceden el límite de la amenidad, o si
+    // no cabe en la capacidad total del área (todos los deptos combinados)
+    // — en cualquiera de esos casos no debe poder registrarse el ingreso.
     const bloqueadoPorMoroso = m.accion === "bloqueado";
     const bloqueadoPorResidentes = r && r.permitido === false;
     const bloqueadoPorInvitados = am.permitido === false;
-    const bloqueado = bloqueadoPorMoroso || bloqueadoPorResidentes || bloqueadoPorInvitados;
+    const bloqueadoPorCapacidad = am.permitidoCapacidad === false;
+    const bloqueado = bloqueadoPorMoroso || bloqueadoPorResidentes || bloqueadoPorInvitados || bloqueadoPorCapacidad;
 
     let motivoBloqueo = "";
     if (bloqueadoPorMoroso) motivoBloqueo = "El depto está moroso y bloqueado.";
     else if (bloqueadoPorResidentes) motivoBloqueo = "Los residentes superan las huellas registradas.";
     else if (bloqueadoPorInvitados) motivoBloqueo = "Los invitados exceden el límite permitido.";
+    else if (bloqueadoPorCapacidad) motivoBloqueo = "No hay cupo en el área — ya está en su capacidad máxima.";
 
     html += `
       <div class="border border-slate-200 rounded-xl p-3 mt-2">
         <p class="text-xs font-bold text-slate-800">${escapeHtml(am.nombre)}</p>
         <p class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(am.horario)} · ${escapeHtml(am.dias)}</p>
         ${permitidoTxt}
+        ${capacidadTxt}
         <p class="text-[11px] text-slate-500 mt-1 whitespace-pre-line">${escapeHtml(am.restricciones)}</p>
         ${bloqueado
           ? `<p class="text-[11px] text-red-600 font-bold mt-2">🚫 No se puede registrar el ingreso: ${escapeHtml(motivoBloqueo)}</p>
