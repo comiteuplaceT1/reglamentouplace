@@ -7,7 +7,7 @@
 const CONFIG = {
   CSV_REGLAMENTO: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=0&single=true&output=csv",
   CSV_AMENIDADES: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxhkaosS4qRt2kAyS1deAd1asEokZpN64gL26nsvBlZ-pk9pGmsurudUhxshUMxFDwqHuZkdImQso6/pub?gid=1334902608&single=true&output=csv",
-  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbw1bFhbWR3FS3JgDyD3RSuxMMonu5o0XQ89MXzhOoiMr7q_7teMxyYfZof87hGvhKFtkQ/exec"
+  WEBAPP_URL: "https://script.google.com/macros/s/AKfycbwgDPvWpBt0axdPhJoCmqMN3xEgCwwxD71_cMHMlHdZ0Fd_mRun7Tw_yal24runQSthaA/exec"
 };
 
 let reglamentoData = [];
@@ -742,8 +742,8 @@ async function ejecutarConsultaDepto() {
       // Bug corregido: con 0 invitados no hay nada que "permitir" — no se
       // muestra un check de "sí puede pasar con sus 0 invitados".
       permitidoTxt = am.limiteInvitados === null
-        ? `<p class="text-xs text-slate-600 mt-1">No trae invitados.</p>`
-        : `<p class="text-xs text-slate-600 mt-1">No trae invitados. (Máximo ${am.limiteInvitados} invitado(s) para este depto si trajera).</p>`;
+        ? `<p class="text-xs text-slate-600 mt-1">No ingresa con invitados.</p>`
+        : `<p class="text-xs text-slate-600 mt-1">No ingresa con invitados. (Máximo ${am.limiteInvitados} invitado(s) para este depto si ingresara con alguno).</p>`;
     } else if (am.limiteInvitados === null) {
       permitidoTxt = `<p class="text-xs text-slate-600 mt-1">Sin límite de invitados registrado por recámara para esta amenidad — revisa las restricciones abajo.</p>`;
     } else {
@@ -761,19 +761,29 @@ async function ejecutarConsultaDepto() {
     // ---------- Capacidad total del área (todos los deptos combinados) ----------
     // La ocupación actual se muestra SIEMPRE (pase o no pase la verificación),
     // no solo cuando sí cabe — para que el guardia tenga el dato de contexto
-    // en cualquier caso. Y se distinguen dos motivos de bloqueo distintos,
-    // porque no es lo mismo: "ya hay gente adentro y no alcanza" (ocupación >
-    // 0) que "tu grupo por sí solo ya supera el máximo del área" (aunque esté
-    // vacía, ocupación = 0) — antes ambos casos usaban el mismo texto y con
-    // 0 ocupados sonaba contradictorio.
+    // en cualquier caso. El mensaje de bloqueo distingue tres situaciones:
+    //   1) Bajando el número de invitados SÍ cabría (le decimos la cifra
+    //      exacta que sí cabe, para que el guardia se lo diga al condómino).
+    //   2) Ni siquiera 0 invitados cabría, pero es porque hay OTRA gente en
+    //      el área ahora mismo.
+    //   3) Ni siquiera 0 invitados cabría, y el área está vacía — el grupo
+    //      de residentes por sí solo ya es más grande que el área.
     let capacidadTxt = "";
     if (am.capacidadTotal !== null) {
       capacidadTxt = `<p class="text-[11px] text-slate-500 mt-1">Cupo del área: ${am.ocupacionTotalAhora} de ${am.capacidadTotal} lo están ocupando ahora (contando a todos los registros, no solo este).</p>`;
       if (!am.permitidoCapacidad) {
-        const motivo = am.ocupacionTotalAhora > 0
-          ? `Ya hay ${am.ocupacionTotalAhora} persona(s) en el área ahora, solo caben ${am.capacidadDisponible} más — no alcanza para los ${am.totalPersonasSolicitadas} que trae este grupo.`
-          : `El grupo que trae (${am.totalPersonasSolicitadas} persona(s)) por sí solo ya supera el máximo del área (${am.capacidadTotal}).`;
-        capacidadTxt += `<p class="text-xs mt-1 font-bold text-red-700">🚫 No caben en el área: ${motivo} Solicita al condómino que baje el número de invitados, o lamentablemente no podrá utilizar el área por ahora.</p>`;
+        const maxInv = am.invitadosMaximoPorCapacidad;
+        let motivo;
+        if (maxInv !== null && maxInv < (am.invitadosSolicitados || 0)) {
+          motivo = maxInv > 0
+            ? `Con los ${r.totalResidentesVisita} residentes apuntados en este grupo, el área solo tiene espacio para <b>${maxInv} invitado(s)</b> más ahora (solicitan ${am.invitadosSolicitados}). Dile al condómino que puede ingresar hasta ${maxInv} invitado(s), no los ${am.invitadosSolicitados} que quiere ingresar.`
+            : `Con los ${r.totalResidentesVisita} residentes apuntados en este grupo, ya no queda espacio para ningún invitado en el área ahora.`;
+        } else {
+          motivo = am.ocupacionTotalAhora > 0
+            ? `Ya hay ${am.ocupacionTotalAhora} persona(s) en el área ahora; con lo que queda disponible no alcanza para los ${r.totalResidentesVisita} residentes apuntados en este grupo. Dile al condómino que puede ingresar hasta ${am.capacidadDisponible} residente(s), no los ${r.totalResidentesVisita} que quiere ingresar.`
+            : `El grupo solicitado (${am.totalPersonasSolicitadas} persona(s)) ya supera por sí solo el máximo del área (${am.capacidadTotal}), sin contar invitados. Dile al condómino que puede ingresar hasta ${am.capacidadDisponible} persona(s) en el área.`;
+        }
+        capacidadTxt += `<p class="text-xs mt-1 font-bold text-red-700">🚫 No caben en el área: ${motivo}</p>`;
       }
     }
 
